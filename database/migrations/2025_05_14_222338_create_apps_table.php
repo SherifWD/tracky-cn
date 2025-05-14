@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('flight_apps', function (Blueprint $table) {
+        Schema::create('app_tos', function (Blueprint $table) {
             $table->id();
             $table->string('name')->nullable();
             $table->string('icon')->nullable();
@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('description')->nullable();
             $table->integer('rating')->default(0);
             $table->boolean('favorite')->default('0');
+            $table->unsignedBigInteger('category_id')->nullable();
+            $table->foreign('category_id')->references('id')->on('app_categories')->onDelete('cascade');
             $table->timestamps();
         });
     }
@@ -28,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('flight_apps');
+        Schema::dropIfExists('app_tos');
     }
 };
