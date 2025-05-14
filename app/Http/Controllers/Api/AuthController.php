@@ -162,7 +162,7 @@ public function updateProfile(Request $request){
             return $this->returnValidationError('E001', $validator);
         }
     
-    $user = FacadesAuth::user();
+    $user = JWTAuth::parseToken()->authenticate();
     if($request->otp){
         if($request->otp != $user->tmp_otp){
             return $this->returnError('404','Incorrect OTP');
