@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Auth;
 
 class AuthController extends Controller
 {
@@ -151,7 +152,7 @@ public function sendOtp($phone, $countryCode, $otp)
         return $this->returnData('token', compact('token','user'), 'User registered successfully');
     }
 
-public function updateProfile(Request $request,$id){
+public function updateProfile(Request $request){
     $validator = Validator::make($request->all(), [
             'name' => 'required',
         ]);
@@ -160,7 +161,7 @@ public function updateProfile(Request $request,$id){
             return $this->returnValidationError('E001', $validator);
         }
     
-    $user = User::find($id);
+    $user = Auth::user();
     if($request->otp){
         if($request->otp != $user->tmp_otp){
             return $this->returnError('404','Incorrect OTP');
