@@ -145,8 +145,8 @@ public function sendOtp($phone, $countryCode, $otp)
             'phone' => $request->phone,
             'country_code' => $request->country_code,
         ]);
-        $user->otp = $otp;
-        $user->tmp_otp = $otp;
+        $user->otp = (string)$otp;
+        $user->tmp_otp = (string)$otp;
         $user->save();
         $token = JWTAuth::fromUser($user);
 
