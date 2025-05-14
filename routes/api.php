@@ -13,7 +13,7 @@ Route::prefix('auth')->group(function () {
 
 Route::prefix('auth')->middleware([JwtMiddleware::class])->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
-    Route::post('update-profile/{id}', [AuthController::class, 'updateProfile']);
+    Route::post('update-profile', [AuthController::class, 'updateProfile']);
     Route::get('auto-login', [AuthController::class, 'getAuthenticatedUser']);
 });
 
