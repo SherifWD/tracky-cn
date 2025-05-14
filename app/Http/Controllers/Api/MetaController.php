@@ -6,7 +6,10 @@ use App\Models\App;
 use App\Models\AppCategory;
 use App\Models\Commission;
 use App\Models\Country;
+use App\Models\HomeImage;
 use App\Models\ShippingLineIcon;
+use App\Models\SourcesContact;
+use App\Models\TicketsContact;
 use App\Traits\backendTraits;
 use App\Traits\HelpersTrait;
 use Illuminate\Http\Request;
@@ -17,9 +20,11 @@ class MetaController extends Controller
     public function getMetaData(){
         $data['commission'] = Commission::all();
         $data['country'] = Country::all();
-        $data['flight_apps'] = AppCategory::with('apps')->get();
+        $data['apps'] = AppCategory::with('apps')->get();
         $data['shipping_icons'] = ShippingLineIcon::all();
-
+        $data['ticket_contact'] = TicketsContact::all();
+        $data['sources_contact'] = SourcesContact::all();
+        $data['home_imgs'] = HomeImage::all();
         return $this->returnData('meta_data',$data,"Meta Data Returned");
     }
 }
