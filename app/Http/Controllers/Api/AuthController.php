@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Auth;
+use Illuminate\Support\Facades\Auth as FacadesAuth;
 
 class AuthController extends Controller
 {
@@ -161,7 +162,7 @@ public function updateProfile(Request $request){
             return $this->returnValidationError('E001', $validator);
         }
     
-    $user = Auth::user();
+    $user = FacadesAuth::user();
     if($request->otp){
         if($request->otp != $user->tmp_otp){
             return $this->returnError('404','Incorrect OTP');
