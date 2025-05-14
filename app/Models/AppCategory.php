@@ -10,4 +10,8 @@ class AppCategory extends Model
     {
         return $this->hasMany(AppTo::class,'category_id');
     }
+     public function getIconAttribute($val)
+    {
+        return ($val !== null) ? asset( $val) : "";
+    }
 }

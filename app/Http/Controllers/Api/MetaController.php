@@ -24,7 +24,6 @@ class MetaController extends Controller
         $data['shipping_icons'] = ShippingLineIcon::all();
         $data['ticket_contact'] = TicketsContact::all();
         $data['sources_contact'] = SourcesContact::all();
-        $data['home_imgs'] = HomeImage::all();
         return $this->returnData('meta_data',$data,"Meta Data Returned");
     }
 }
