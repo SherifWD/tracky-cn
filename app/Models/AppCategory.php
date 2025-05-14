@@ -8,6 +8,6 @@ class AppCategory extends Model
 {
     public function apps()
     {
-        return $this->belongsTo(AppTo::class);
+        return $this->hasMany(AppTo::class,'category_id');
     }
 }
