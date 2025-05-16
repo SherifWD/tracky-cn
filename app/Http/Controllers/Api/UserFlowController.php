@@ -156,6 +156,7 @@ public function ReceiptPayment(Request $request)
         'original_price' => $originalPrice,
         'after_commission_price' => $commissionRate,
         'usd_conversion' => $usdConversion,
+        'user_id' => auth()->id(),
     ]);
 
     return response()->json([
