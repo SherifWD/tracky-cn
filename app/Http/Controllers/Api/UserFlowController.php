@@ -64,12 +64,14 @@ class UserFlowController extends Controller
     if ($validator->fails()) {
         return $this->returnValidationError('E001', $validator);
     }
-    $request->user_id = Auth::user()->id;
-
-        $reservation = ReserveTranslator::Create($request->all());
+    // $request->user_id = Auth::user()->id;
+$data = $request->all();
+$data['user_id'] = auth()->id();
+ReserveTranslator::create($data);
+        // $reservation = ReserveTranslator::Create($request->all());
         
-        if($reservation){
-            return $this->returnData('translator',$reservation,'Reserved Translator Successfully');
+        if($data){
+            return $this->returnData('translator',$data,'Reserved Translator Successfully');
         }else
         return $this->returnError('404','Failed to reserve translator');
 
