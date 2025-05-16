@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('harbor_id_to')->nullable();
             $table->foreign('harbor_id_to')->references('id')->on('harbor_locations')->onDelete('cascade');
             $table->unsignedBigInteger('container_price_id')->nullable();
-            $table->foreign('container_price_id')->references('id')->on('container_price_by_countries')->onDelete('cascade');
+            $table->foreign('container_price_id')->references('id')->on('container_price_by_harbors')->onDelete('cascade');
             $table->date('date')->nullable();
             $table->double('base_price')->nullable();
             $table->timestamps();
