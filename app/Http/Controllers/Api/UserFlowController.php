@@ -40,7 +40,9 @@ class UserFlowController extends Controller
 
     // Calculate number of days
     $days = $from->diffInDays($to) + 1; // +1 to include the start day
-    $request->user_id = Auth::user()->id;
+    $data = $request->all();
+$data['user_id'] = auth()->id();
+// ReserveTranslator::create($data);
 
     // Get translator rate
     $country = Country::find($request->country_id);
@@ -195,8 +197,9 @@ public function reserveShipping(Request $request){
     $price_id = ContainerPriceByHarbor::where('container_id',$request->container_id)->where('harbor_id',$request->harbor_id_from)->where('base_price',$request->price)->first()->id;
     else
     return $this->returnError('404','Not Found');
+
     $reserve = new ReservedShipping();
-    $reserve->user_id = Auth::user()->id;
+    $reserve->user_id = auth()->id();
     $reserve->container_id = $request->container_id;
     $reserve->harbor_id_from = $request->harbor_id_from;
     $reserve->harbor_id_to = $request->harbor_id_to;
