@@ -6,7 +6,9 @@ use App\Models\App;
 use App\Models\AppCategory;
 use App\Models\Commission;
 use App\Models\Country;
+use App\Models\HarborLocation;
 use App\Models\HomeImage;
+use App\Models\ShippingContainer;
 use App\Models\ShippingLineIcon;
 use App\Models\SourcesContact;
 use App\Models\TicketsContact;
@@ -24,6 +26,8 @@ class MetaController extends Controller
         $data['shipping_icons'] = ShippingLineIcon::all();
         $data['ticket_contact'] = TicketsContact::all();
         $data['sources_contact'] = SourcesContact::all();
+        $data['shipping_container'] = ShippingContainer::all();
+        $data['harbor_locations'] = HarborLocation::all();
         return $this->returnData('meta_data',$data,"Meta Data Returned");
     }
 }

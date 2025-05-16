@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\UserFlowController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Middleware\JwtMiddleware;
@@ -18,8 +19,14 @@ Route::prefix('auth')->middleware([JwtMiddleware::class])->group(function () {
     Route::get('auto-login', [AuthController::class, 'getAuthenticatedUser']);
 });
 
-Route::middleware([JwtMiddleware::class])->group(function () {
+Route::group(['middleware' => 'jwt.verify'], function() {
     Route::get('meta-data', [MetaController::class, 'getMetaData']);
+    Route::post('reserve-translator', [UserFlowController::class, 'reserveTranslator']);
+    Route::post('calculate-reservation', [UserFlowController::class, 'calculateReservationPrice']);
+    Route::post('calculate-cbm', [UserFlowController::class, 'calculateCBM']);
+    Route::post('receipt-payment', [UserFlowController::class, 'ReceiptPayment']);
+    Route::post('calculate-price-container', [UserFlowController::class, 'getPriceContainerByHarbor']);
+    Route::post('reserve-container', [UserFlowController::class, 'reserveShipping']);
 
 
 });
