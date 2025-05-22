@@ -41,8 +41,8 @@ class UserFlowController extends Controller
     // Calculate number of days
     $days = $from->diffInDays($to) + 1; // +1 to include the start day
     $data = $request->all();
-$data['user_id'] = auth()->id();
-// ReserveTranslator::create($data);
+    $data['user_id'] = auth()->id();
+    // ReserveTranslator::create($data);
 
     // Get translator rate
     $country = Country::find($request->country_id);
@@ -67,9 +67,9 @@ $data['user_id'] = auth()->id();
         return $this->returnValidationError('E001', $validator);
     }
     // $request->user_id = Auth::user()->id;
-$data = $request->all();
-$data['user_id'] = auth()->id();
-ReserveTranslator::create($data);
+        $data = $request->all();
+        $data['user_id'] = auth()->id();
+        ReserveTranslator::create($data);
         // $reservation = ReserveTranslator::Create($request->all());
         
         if($data){
@@ -132,8 +132,8 @@ public function calculateCBM(Request $request)
 public function ReceiptPayment(Request $request)
 {
     $validator = Validator::make($request->all(), [
-        'from_country_id' => 'required|exists:countries,id',
-        'to_country_id' => 'required|exists:countries,id',
+        'from_country' => 'required',
+        'to_country' => 'required',
         'original_price' => 'required|numeric|min:0',
         'commission_rate' => 'nullable|numeric', 
         'usd_conversion' => 'nullable|numeric|min:0', // Optional override
@@ -151,8 +151,8 @@ public function ReceiptPayment(Request $request)
     $usdConversion = $request->usd_conversion;   // example: 1 USD = 30 local currency
 
     $receipt = ReceiptPayment::create([
-        'from_country_id' => $request->from_country_id,
-        'to_country_id' => $request->to_country_id,
+        'from_country' => $request->from_country,
+        'to_country' => $request->to_country,
         'original_price' => $originalPrice,
         'after_commission_price' => $commissionRate,
         'usd_conversion' => $usdConversion,
@@ -169,7 +169,7 @@ public function getPriceContainerByHarbor(Request $request){
     $validator = Validator::make($request->all(), [
         'container_id' => 'required|numeric|exists:shipping_containers,id',
         'harbor_id' => 'required|numeric|exists:harbor_locations,id',
-        
+        'count' => 'required|numeric',
     ]);
     if ($validator->fails()) {
         return response()->json([
@@ -178,7 +178,8 @@ public function getPriceContainerByHarbor(Request $request){
         ], 422);
     }
     $price['price'] = ContainerPriceByHarbor::where('container_id',$request->container_id)->where('harbor_id',$request->harbor_id)->orderByDesc('id')->first()->base_price;
-    return $this->returnData('price',$price,'Price of the Container');
+    $t_price['price'] = $price['price'] * $request->count;
+    return $this->returnData('price',$t_price,'Price of the Container');
 }
 public function reserveShipping(Request $request){
     $validator = Validator::make($request->all(), [
