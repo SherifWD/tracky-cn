@@ -34,5 +34,11 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'ocean_tracking' => [
+    'url' => env('OCEAN_API_URL'),
+    'app_id' => env('OCEAN_APP_ID'),
+    'secret' => env('OCEAN_SECRET'),
+],
+
 
 ];

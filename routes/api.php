@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Api\Controllers\SubscriptionController;
 use App\Http\Controllers\Api\UserFlowController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MetaController;
@@ -27,6 +28,7 @@ Route::group(['middleware' => 'jwt.verify'], function() {
     Route::post('receipt-payment', [UserFlowController::class, 'ReceiptPayment']);
     Route::post('calculate-price-container', [UserFlowController::class, 'getPriceContainerByHarbor']);
     Route::post('reserve-container', [UserFlowController::class, 'reserveShipping']);
+    Route::post('/track-shipment', [SubscriptionController::class, 'subscribeToShipmentTracking']);
 
 
 });
