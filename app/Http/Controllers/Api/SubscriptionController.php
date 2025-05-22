@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\ReservedShipping;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-
+use Illuminate\Support\Facades\Log;
 class SubscriptionController extends Controller
 {
     
@@ -16,7 +16,6 @@ class SubscriptionController extends Controller
 public function getAllTrackedShippings()
 {
     $shippings = ReservedShipping::with([
-        'container',        // Make sure container has container_no
         'user',
         'harborFrom',
         'harborTo',
@@ -25,15 +24,24 @@ public function getAllTrackedShippings()
     $results = [];
 
     foreach ($shippings as $shipment) {
-        $trackingResponse = null;
+        try {
+            // Validate required fields
+            if (
+                !$shipment->container_no ||
+                !$shipment->carrier_code ||
+                !$shipment->port_code
+            ) {
+                $results[] = [
+                    'shipping' => $shipment,
+                    'tracking' => [
+                        'code' => 422,
+                        'message' => 'Missing required tracking fields (container_no, carrier_code, or port_code).',
+                    ],
+                ];
+                continue;
+            }
 
-        // Check required fields before making API call
-        if (
-            $shipment->container &&
-            $shipment->container_no &&
-            $shipment->carrier_code &&
-            $shipment->port_code
-        ) {
+            // Prepare payload
             $payload = [
                 'billNo' => $shipment->track_number ?? '',
                 'containerNo' => $shipment->container_no,
@@ -43,29 +51,52 @@ public function getAllTrackedShippings()
                 'dataType' => ['CARRIER'],
             ];
 
+            // Generate signValue
             $secret = config('services.ocean_tracking.secret');
             $signValue = base64_encode(
                 hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE), $secret, true)
             );
 
-            $response = Http::withHeaders([
+            // Prepare headers
+            $headers = [
                 'Content-Type' => 'application/json',
                 'appId' => config('services.ocean_tracking.app_id'),
                 'signValue' => $signValue,
-            ])->post(config('services.ocean_tracking.url'), $payload);
-                    dd($response);
-            if ($response->successful()) {
-                $trackingResponse = $response->json();
-            } else {
-                $trackingResponse = [
+            ];
+
+            // Log everything for debug
+            Log::info('Tracking Request', [
+                'shipment_id' => $shipment->id,
+                'headers' => $headers,
+                'payload' => $payload,
+            ]);
+
+            // Make API call
+            $response = Http::withHeaders($headers)
+                ->post(config('services.ocean_tracking.url'), $payload);
+
+            Log::info('Tracking Response', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            $trackingResponse = $response->successful()
+                ? $response->json()
+                : [
                     'code' => $response->status(),
-                    'message' => $response->json('message') ?? 'Tracking failed'
+                    'message' => $response->json('message') ?? 'Tracking failed',
+                    'error_details' => $response->json(),
                 ];
-            }
-        } else {
+        } catch (\Exception $e) {
+            Log::error('Tracking Exception', [
+                'shipment_id' => $shipment->id,
+                'error' => $e->getMessage(),
+            ]);
+
             $trackingResponse = [
-                'code' => 422,
-                'message' => 'Missing required fields for tracking',
+                'code' => 500,
+                'message' => 'Exception occurred during tracking.',
+                'error' => $e->getMessage(),
             ];
         }
 
