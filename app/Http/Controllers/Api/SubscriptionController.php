@@ -53,7 +53,7 @@ public function getAllTrackedShippings()
                 'appId' => config('services.ocean_tracking.app_id'),
                 'signValue' => $signValue,
             ])->post(config('services.ocean_tracking.url'), $payload);
-
+                    dd($response);
             if ($response->successful()) {
                 $trackingResponse = $response->json();
             } else {

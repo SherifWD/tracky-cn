@@ -188,6 +188,7 @@ public function reserveShipping(Request $request){
         'harbor_id_to' => 'required|numeric|exists:harbor_locations,id',
         'date' => 'required|date',
         'price' => 'required|numeric',
+        'count' => 'required|numeric',
     ]);
     if ($validator->fails()) {
         return response()->json([
@@ -208,6 +209,7 @@ public function reserveShipping(Request $request){
     $reserve->date = $request->date;
     $reserve->base_price = $request->price;
     $reserve->container_price_id = $price_id;
+    $reserve->count = $request->count;
     $reserve->save();
     return $this->returnData('data',$reserve,'Shipping Reserved, Please Wait for Confirmation');
 
