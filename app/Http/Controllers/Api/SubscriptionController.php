@@ -30,13 +30,13 @@ public function getAllTrackedShippings()
         // Check required fields before making API call
         if (
             $shipment->container &&
-            $shipment->container->container_no &&
+            $shipment->container_no &&
             $shipment->carrier_code &&
             $shipment->port_code
         ) {
             $payload = [
                 'billNo' => $shipment->track_number ?? '',
-                'containerNo' => $shipment->container->container_no,
+                'containerNo' => $shipment->container_no,
                 'carrierCode' => $shipment->carrier_code,
                 'portCode' => $shipment->port_code,
                 'isExport' => $shipment->is_export ?? 'E',
