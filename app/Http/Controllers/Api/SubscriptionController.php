@@ -56,14 +56,21 @@ public function getAllTrackedShippings()
             $signValue = base64_encode(
                 hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE), $secret, true)
             );
-
+                $token = Http::withHeaders([
+    'Content-Type' => 'application/json',
+])->post('https://prod-api.4portun.com/openapi/auth/token', [
+    'appId' => config('services.ocean_tracking.app_id'),
+    'secret' => config('services.ocean_tracking.secret')
+]);
+// dd($token->json());
+ $tok = $token->json()['data'];
             // Prepare headers
             $headers = [
                 'Content-Type' => 'application/json',
                 'appId' => config('services.ocean_tracking.app_id'),
-                'signValue' => $signValue,
+                'Authorization' => $tok,
             ];
-
+// dd($headers);
             // Log everything for debug
             Log::info('Tracking Request', [
                 'shipment_id' => $shipment->id,
@@ -71,10 +78,13 @@ public function getAllTrackedShippings()
                 'payload' => $payload,
             ]);
 
+
+           
+// dd($headers,$payload);
             // Make API call
             $response = Http::withHeaders($headers)
-                ->post(config('services.ocean_tracking.url'), $payload);
-
+                ->post("https://prod-api.4portun.com/openapi/gateway/api/ais/vessel-location", $payload);
+// dd($response->json());
             Log::info('Tracking Response', [
                 'status' => $response->status(),
                 'body' => $response->body(),
