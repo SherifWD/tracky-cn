@@ -241,7 +241,7 @@ public function getRates(Request $request)
     } else {
         $filteredRates = $allRates;
     }
-$data['all'] = $allRates->values();
+// $data['all'] = $allRates->values();
     $data['filtered'] = $filteredRates->values();
     return $this->returnData('data',$data,"Curve Data");
     
@@ -291,7 +291,7 @@ public function getPrices(Request $request)
     } else {
         $filtered = $all;
     }
-    $data['all'] = $all->values();
+    // $data['all'] = $all->values();
     $data['filtered'] = $filtered->values();
     return $this->returnData('data',$data,"Curve Data");
 }
