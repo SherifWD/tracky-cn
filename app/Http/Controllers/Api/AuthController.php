@@ -168,6 +168,12 @@ public function updateProfile(Request $request){
             return $this->returnError('404','Incorrect OTP');
         }
     }
+    
+
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('images');
+            $user->image = $imagePath;
+        }
     $user->name = $request->name ?? $user->name;
     $user->phone = $request->phone ?? $user->phone;
     $user->country_code = $request->country_code ?? $user->country_code;

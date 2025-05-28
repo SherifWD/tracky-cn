@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ContainerPriceByHarbor;
 use App\Models\Country;
+use App\Models\CurrencyRate;
+use App\Models\FutianLocation;
 use App\Models\ReceiptPayment;
 use App\Models\ReservedShipping;
 use App\Models\ReserveTranslator;
@@ -214,5 +216,88 @@ public function reserveShipping(Request $request){
     return $this->returnData('data',$reserve,'Shipping Reserved, Please Wait for Confirmation');
 
 }
+public function getRates(Request $request)
+{
+    $range = $request->input('range', null);
+    $allRates = CurrencyRate::orderBy('date')->get();
 
+    if ($range) {
+        $startDate = match ($range) {
+            '5y' => now()->subYears(5)->toDateString(),
+            '1y' => now()->subYear()->toDateString(),
+            '1m' => now()->subMonth()->toDateString(),
+            '1w' => now()->subWeek()->toDateString(),
+            '1d' => now()->subDay()->toDateString(),
+            default => now()->subDay()->toDateString(),
+        };
+
+        \Log::info('Filter Start Date:', ['startDate' => $startDate]);
+
+        $filteredRates = CurrencyRate::where('date', '>=', $startDate)
+            ->orderBy('date')
+            ->get();
+
+        \Log::info('Filtered count:', ['count' => $filteredRates->count()]);
+    } else {
+        $filteredRates = $allRates;
+    }
+$data['all'] = $allRates->values();
+    $data['filtered'] = $filteredRates->values();
+    return $this->returnData('data',$data,"Curve Data");
+    
+}
+
+public function getPrices(Request $request)
+{
+    $range = $request->input('range'); // e.g. 1m, 1y
+    $containerId = $request->input('container_id');
+    $harborId = $request->input('harbor_id');
+
+    // Query for all prices matching container_id and harbor_id
+    $allQuery = ContainerPriceByHarbor::orderBy('date');
+
+    if ($containerId) {
+        $allQuery->where('container_id', $containerId);
+    }
+
+    if ($harborId) {
+        $allQuery->where('harbor_id', $harborId);
+    }
+
+    $all = $allQuery->get();
+
+    // Apply date filtering if range is specified
+    if ($range) {
+        $startDate = match ($range) {
+            '5y' => now()->subYears(5),
+            '1y' => now()->subYear(),
+            '1m' => now()->subMonth(),
+            '1w' => now()->subWeek(),
+            '1d' => now()->subDay(),
+            default => now()->subDay(),
+        };
+
+        $filteredQuery = ContainerPriceByHarbor::where('date', '>=', $startDate)->orderBy('date');
+
+        if ($containerId) {
+            $filteredQuery->where('container_id', $containerId);
+        }
+
+        if ($harborId) {
+            $filteredQuery->where('harbor_id', $harborId);
+        }
+
+        $filtered = $filteredQuery->get();
+    } else {
+        $filtered = $all;
+    }
+    $data['all'] = $all->values();
+    $data['filtered'] = $filtered->values();
+    return $this->returnData('data',$data,"Curve Data");
+}
+
+public function futianLocations(){
+    $data['location'] = FutianLocation::all();
+    return $this->returnData('data',$data,"Futian Locations");
+}
 }

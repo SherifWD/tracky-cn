@@ -23,4 +23,9 @@ class User extends Authenticatable implements JWTSubject
         return [];
     }
 protected $guarded =[];
+ public function getImageAttribute($val)
+    {
+        return ($val !== null) ? asset('/'.$val) : "";
+
+    }
 }
