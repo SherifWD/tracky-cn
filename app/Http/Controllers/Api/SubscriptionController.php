@@ -50,7 +50,7 @@ public function getAllTrackedShippings()
                     'searchKey' => $shipment->ship_name,
                     'searchType' => 'ENAME', // or 'IMO' if using IMO number
                 ];
-
+dd($bearerToken);
                 $headers = [
                     'Content-Type' => 'application/json',
                     'appId' => config('services.ocean_tracking.app_id'),
