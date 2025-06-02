@@ -40,6 +40,7 @@ public function getAllTrackedShippings()
 
             // Prepare payload
             $payload = [
+                'mmsi' => $shipment->subscription_id,
                 'billNo' => $shipment->track_number ?? '',
                 'containerNo' => $shipment->container_no,
                 'carrierCode' => $shipment->carrier_code,
