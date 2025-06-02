@@ -12,99 +12,87 @@ class SubscriptionController extends Controller
 {
 public function getAllTrackedShippings()
 {
-    $shippings = ReservedShipping::with(['user', 'harborFrom', 'harborTo'])->get();
+    $shippings = ReservedShipping::with([
+        'user',
+        'harborFrom',
+        'harborTo',
+    ])->get();
+
     $results = [];
 
-    // Get the bearer token once
-    try {
-        $tokenResponse = Http::withHeaders([
-            'Content-Type' => 'application/json',
-        ])->post('https://prod-api.4portun.com/openapi/auth/token', [
-            'appId' => config('services.ocean_tracking.app_id'),
-            'secret' => config('services.ocean_tracking.secret'),
-        ]);
-
-        if (!$tokenResponse->successful()) {
-            throw new \Exception("Token fetch failed: " . $tokenResponse->body());
-        }
-
-        $bearerToken = $tokenResponse->json()['data'] ?? null;
-        if (!$bearerToken) {
-            throw new \Exception("Token data missing from response.");
-        }
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Failed to retrieve bearer token.',
-            'details' => $e->getMessage(),
-        ], 500);
-    }
-
     foreach ($shippings as $shipment) {
-        $vesselTracking = null;
-        $portDataTracking = null;
-
         try {
-            // ========= 1. Vessel Real-Time Location =========
-            if ($shipment->ship_name) {
-                $payload = [
-                    'searchKey' => $shipment->ship_name,
-                    'searchType' => 'ENAME', // or 'IMO' if using IMO number
+            // Validation
+            if (
+                !$shipment->container_no ||
+                !$shipment->carrier_code ||
+                !$shipment->port_code
+            ) {
+                $results[] = [
+                    'shipping' => $shipment,
+                    'tracking' => [
+                        'code' => 422,
+                        'message' => 'Missing required tracking fields (container_no, carrier_code, or port_code).',
+                    ],
                 ];
-dd($bearerToken);
-                $headers = [
-                    'Content-Type' => 'application/json',
-                    'appId' => config('services.ocean_tracking.app_id'),
-                    'Authorization' => 'Bearer '.$bearerToken,
-                ];
-
-                Log::info('Vessel Location Request', ['shipment_id' => $shipment->id, 'payload' => $payload]);
-
-                $response = Http::withHeaders($headers)
-                    ->post('https://prod-api.4portun.com/openapi/gateway/api/ais/singleShip', $payload);
-
-                Log::info('Vessel Location Response', [
-                    'shipment_id' => $shipment->id,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                if ($response->successful() && isset($response['data'])) {
-                    $data = $response['data'];
-                    $shipment->update([
-                        'ship_lat'     => $data['lat'] ?? null,
-                        'ship_lon'     => $data['lon'] ?? null,
-                        'ship_status'  => $data['naviStat'] ?? null,
-                        'ship_eta'     => $data['eta'] ?? null,
-                        'ship_speed'   => $data['sog'] ?? null,
-                    ]);
-                    $vesselTracking = $data;
-                } else {
-                    $vesselTracking = [
-                        'code' => $response->status(),
-                        'message' => $response->json('message') ?? 'Vessel tracking failed',
-                        'error_details' => $response->json(),
-                    ];
-                }
+                continue;
             }
 
-            // ========= 2. Port Data by Subscription ID =========
-            if ($shipment->subscription_id) {
-                $portPayload = ['subscriptionId' => $shipment->subscription_id];
-                $signSecret = config('services.ocean_tracking.secret');
-                $signValue = base64_encode(
-                    hash_hmac('sha256', json_encode($portPayload, JSON_UNESCAPED_UNICODE), $signSecret, true)
-                );
+            // Prepare Payload for Real-Time Vessel API
+            $vesselPayload = [
+                'billNo' => $shipment->track_number ?? '',
+                'containerNo' => $shipment->container_no,
+                'carrierCode' => $shipment->carrier_code,
+                'portCode' => $shipment->port_code,
+                'isExport' => $shipment->is_export ?? 'E',
+                'dataType' => ['CARRIER'],
+            ];
 
-                $portHeaders = [
-                    'Content-Type' => 'application/json',
-                    'appId' => config('services.ocean_tracking.app_id'),
-                    'signValue' => $signValue,
+            // Get Token First
+            $tokenResponse = Http::withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post('https://prod-api.4portun.com/openapi/auth/token', [
+                'appId' => config('services.ocean_tracking.app_id'),
+                'secret' => config('services.ocean_tracking.secret')
+            ]);
+
+            $accessToken = $tokenResponse->json('data');
+
+            if (!$accessToken) {
+                throw new \Exception('Authorization token not received.');
+            }
+
+            // Common headers for both API calls
+            $headers = [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken,
+            ];
+
+            // Real-Time Vessel Tracking
+            $vesselResponse = Http::withHeaders($headers)
+                ->post('https://prod-api.4portun.com/openapi/gateway/api/ais/vessel-location', $vesselPayload);
+
+            Log::info('Vessel Tracking Response', [
+                'shipment_id' => $shipment->id,
+                'status' => $vesselResponse->status(),
+                'body' => $vesselResponse->body(),
+            ]);
+
+            $vesselTracking = $vesselResponse->successful()
+                ? $vesselResponse->json()
+                : [
+                    'code' => $vesselResponse->status(),
+                    'message' => $vesselResponse->json('message') ?? 'Vessel tracking failed',
+                    'error_details' => $vesselResponse->json(),
                 ];
 
-                Log::info('Port Data Request', ['shipment_id' => $shipment->id, 'payload' => $portPayload]);
-
-                $portResponse = Http::withHeaders($portHeaders)
-                    ->post('https://prod-api.4portun.com/openapi/gateway/api/portdata/query', $portPayload);
+            // Port Data Tracking (if subscriptionId exists)
+            $portTracking = null;
+            if (!empty($shipment->subscription_id)) {
+                $portResponse = Http::withHeaders($headers)
+                    ->post('https://prod-api.4portun.com/openapi/gateway/api/portdata/query', [
+                        'subscriptionId' => $shipment->subscription_id,
+                    ]);
 
                 Log::info('Port Data Response', [
                     'shipment_id' => $shipment->id,
@@ -112,38 +100,34 @@ dd($bearerToken);
                     'body' => $portResponse->body(),
                 ]);
 
-                if ($portResponse->successful() && isset($portResponse['data'])) {
-                    $d = $portResponse['data'];
-                    $shipment->update([
-                        'vessel_name'   => $d['vesselName'] ?? null,
-                        'voyage'        => $d['voyage'] ?? null,
-                        'imo_number'    => $d['imoNo'] ?? null,
-                        'call_sign'     => $d['callSign'] ?? null,
-                        'terminal_code' => $d['terminalCode'] ?? null,
-                        'terminal_name' => $d['terminalName'] ?? null,
-                        'eta'           => $d['eta'] ?? null,
-                        'etd'           => $d['etd'] ?? null,
-                        'ata'           => $d['ata'] ?? null,
-                        'atd'           => $d['atd'] ?? null,
-                    ]);
-                    $portDataTracking = $d;
-                } else {
-                    $portDataTracking = [
+                $portTracking = $portResponse->successful()
+                    ? $portResponse->json()
+                    : [
                         'code' => $portResponse->status(),
-                        'message' => $portResponse->json('message') ?? 'Port data fetch failed',
+                        'message' => $portResponse->json('message') ?? 'Port data tracking failed',
                         'error_details' => $portResponse->json(),
                     ];
-                }
             }
 
         } catch (\Exception $e) {
-            Log::error('Tracking Exception', ['shipment_id' => $shipment->id, 'error' => $e->getMessage()]);
+            Log::error('Tracking Exception', [
+                'shipment_id' => $shipment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $vesselTracking = [
+                'code' => 500,
+                'message' => 'Exception during vessel tracking',
+                'error' => $e->getMessage(),
+            ];
+
+            $portTracking = null;
         }
 
         $results[] = [
-            'shipping' => $shipment->fresh(), // ensure updated values are included
-            'vessel_tracking' => $vesselTracking,
-            'port_tracking' => $portDataTracking,
+            'shipping' => $shipment,
+            'vessel_tracking' => $vesselTracking ?? null,
+            'port_tracking' => $portTracking ?? null,
         ];
     }
 
