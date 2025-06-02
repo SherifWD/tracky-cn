@@ -54,7 +54,7 @@ public function getAllTrackedShippings()
                 $headers = [
                     'Content-Type' => 'application/json',
                     'appId' => config('services.ocean_tracking.app_id'),
-                    'Authorization' => $bearerToken,
+                    'Authorization' => 'Bearer '.$bearerToken,
                 ];
 
                 Log::info('Vessel Location Request', ['shipment_id' => $shipment->id, 'payload' => $payload]);
