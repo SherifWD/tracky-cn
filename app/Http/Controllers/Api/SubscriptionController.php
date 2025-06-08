@@ -50,7 +50,7 @@ public function getAllTrackedShippings()
             ];
 
             $portHistoryPayload = [
-                'mmsi' => $shipment->reservation_string,
+                'mmsi' => $shipment->subscription_id,
                 'berthTimeStart' => $shipment->berth_start,
                 'berthTimeEnd' => $shipment->berth_end,
             ];
