@@ -49,11 +49,10 @@ public function getAllTrackedShippings()
                 'dataType' => ['CARRIER'],
             ];
 
-            $payload2 = [
-                'portCode' => $shipment->port_code,
-                'isExport' => $shipment->is_export ?? 'E',
-                'containerNo' => $shipment->container_no,
-                'carrierCode' => $shipment->carrier_code,
+            $portHistoryPayload = [
+                'mmsi' => $shipment->mmsi,
+                'berthTimeStart' => now()->subMonths(3)->format('Y-m-d H:i:s'),
+                'berthTimeEnd' => now()->format('Y-m-d H:i:s'),
             ];
 
             // Get token
@@ -92,7 +91,7 @@ public function getAllTrackedShippings()
 
             // Port tracking call
             $portResponse = Http::withHeaders($headers)
-                ->post("https://prod-api.4portun.com/openapi/gateway/api/portdata/subscribe", $payload2);
+                ->post("https://prod-api.4portun.com/openapi/gateway/api/ais/port-of-call", $portHistoryPayload);
 
             Log::info('Port Tracking Response', [
                 'shipment_id' => $shipment->id,

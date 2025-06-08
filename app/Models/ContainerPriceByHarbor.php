@@ -10,5 +10,12 @@ class ContainerPriceByHarbor extends Model
     protected $casts = [
     'date' => 'date',
 ];
-
+  public function container()
+{
+    return $this->belongsTo(ShippingContainer::class, 'container_id');
+}
+  public function harbor()
+{
+    return $this->belongsTo(HarborLocation::class, 'harbor_id');
+}
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AppCategory extends Model
 {
+    protected $guarded = [];
     public function apps()
     {
         return $this->hasMany(AppTo::class,'category_id');
