@@ -51,8 +51,8 @@ public function getAllTrackedShippings()
 
             $portHistoryPayload = [
                 'mmsi' => $shipment->reservation_string,
-                'berthTimeStart' => $shipment->bearth_start,
-                'berthTimeEnd' => $shipment->bearth_end,
+                'berthTimeStart' => $shipment->berth_start,
+                'berthTimeEnd' => $shipment->berth_end,
             ];
 
             // Get token
