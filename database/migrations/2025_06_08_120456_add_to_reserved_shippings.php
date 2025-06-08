@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reserved_shippings', function (Blueprint $table) {
-            $table->string('berth_start')->nullable();
-            $table->string('berth_end')->nullable();
+            $table->dateTime('berth_start')->nullable();
+            $table->dateTime('berth_end')->nullable();
 
         });
     }
