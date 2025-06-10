@@ -16,7 +16,8 @@ public function getAllTrackedShippings()
         'user',
         'harborFrom',
         'harborTo',
-    ])->get();
+        'container'
+    ])->where('user_id',auth()->id())->get();
 
     $results = [];
 
