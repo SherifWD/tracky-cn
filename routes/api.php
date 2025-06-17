@@ -30,7 +30,7 @@ Route::group(['middleware' => 'jwt.verify'], function() {
     Route::post('reserve-container', [UserFlowController::class, 'reserveShipping']);
 Route::get('/shippings/tracked', [SubscriptionController::class, 'getAllTrackedShippings']);
 Route::get('/shippings/tracked/{id}', [SubscriptionController::class, 'getAllTrackedShippings']);
-Route::[pst]('/search-shipment', [SubscriptionController::class, 'getTrackedShippingByID']);
+Route::post('/search-shipment', [SubscriptionController::class, 'getTrackedShippingByID']);
 Route::post('/currency-rates', [UserFlowController::class, 'getRates']);
 Route::post('/container-price-by-harbor', [UserFlowController::class, 'getPrices']);
 Route::get('/futian-locations', [UserFlowController::class, 'futianLocations']);
