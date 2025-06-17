@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ReservedShipping;
 use App\Models\User;
 use App\Traits\backendTraits;
 use App\Traits\HelpersTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -38,7 +40,6 @@ public function loginValidateOtp(Request $request)
             })
             ->first();
 
-
         if (!$user) {
             return $this->returnError('E003', 'User not found. Please register.');
         }
@@ -46,12 +47,86 @@ public function loginValidateOtp(Request $request)
         // Generate a random OTP
         $token = JWTAuth::fromUser($user);
 
-return $this->returnData('token', compact('token'), 'OTP validated successfully');
+        // ✅ Update shipments for this user that are not finalized (status ≠ 3)
+        $shipments = ReservedShipping::where('user_id', $user->id)
+            ->where('status', '!=', 3)
+            ->get();
+
+        foreach ($shipments as $shipment) {
+            try {
+                if (
+                    !$shipment->container_no ||
+                    !$shipment->carrier_code ||
+                    !$shipment->port_code
+                ) {
+                    continue;
+                }
+
+                // Get tracking token
+                $tokenResponse = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->post('https://prod-api.4portun.com/openapi/auth/token', [
+                    'appId' => config('services.ocean_tracking.app_id'),
+                    'secret' => config('services.ocean_tracking.secret'),
+                ]);
+                $authToken = $tokenResponse->json()['data'];
+
+                // Prepare request headers
+                $headers = [
+                    'Content-Type' => 'application/json',
+                    'appId' => config('services.ocean_tracking.app_id'),
+                    'Authorization' => $authToken,
+                ];
+
+                // Port tracking request
+                $portPayload = [
+                    'mmsi' => $shipment->subscription_id,
+                    'berthTimeStart' => $shipment->berth_start,
+                    'berthTimeEnd' => $shipment->berth_end,
+                ];
+
+                $portResponse = Http::withHeaders($headers)
+                    ->post("https://prod-api.4portun.com/openapi/gateway/api/ais/port-of-call", $portPayload);
+
+                $portTracking = $portResponse->successful()
+                    ? $portResponse->json()
+                    : [];
+
+                // Determine new status code
+                $statusCode = $shipment->status;
+                if ($shipment->status === 0) {
+                    $statusCode = 0;
+                } elseif ($shipment->status === 3) {
+                    $statusCode = 3;
+                } elseif (
+                    isset($portTracking['code']) && $portTracking['code'] === 200 &&
+                    isset($portTracking['data']) && is_array($portTracking['data']) && empty($portTracking['data'])
+                ) {
+                    $statusCode = 1;
+                } elseif (
+                    isset($portTracking['code']) && $portTracking['code'] === 200 &&
+                    isset($portTracking['data']) && is_array($portTracking['data']) && !empty($portTracking['data'])
+                ) {
+                    $statusCode = 2;
+                }
+
+                // Save the new status
+                $shipment->status = $statusCode;
+                $shipment->save();
+
+            } catch (\Exception $ex) {
+                \Log::error("Failed updating shipment ID {$shipment->id}: " . $ex->getMessage());
+                continue;
+            }
+        }
+
+        return $this->returnData('token', compact('token'), 'OTP validated successfully');
     } catch (\Exception $e) {
         \Log::error("Error in loginValidateOtp: " . $e->getMessage());
         return $this->returnError('E500', 'Failed to process request. Please try again.');
     }
 }
+
 
 public function validateOtp(Request $request)
 {

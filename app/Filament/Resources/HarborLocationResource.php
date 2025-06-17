@@ -26,8 +26,12 @@ class HarborLocationResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->maxLength(255)
                     ->default(null),
-                Forms\Components\TextInput::make('country_id')
-                    ->numeric()
+                Forms\Components\TextInput::make('lat')
+                    ->default(null),
+                Forms\Components\TextInput::make('lng')
+                    ->default(null),
+                    Forms\Components\Select::make('country_id')
+                ->relationship(name: 'country', titleAttribute: 'country')
                     ->default(null),
             ]);
     }
@@ -37,6 +41,10 @@ class HarborLocationResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('lat')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('lng')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('country_id')
                     ->numeric()
