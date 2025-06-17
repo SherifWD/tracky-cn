@@ -100,7 +100,7 @@ public function loginValidateOtp(Request $request)
                     $statusCode = 3;
                 } elseif (
                     isset($portTracking['code']) && $portTracking['code'] === 200 &&
-                    isset($portTracking['data']) && is_array($portTracking['data']) && empty($portTracking['data'])
+                    isset($portTracking['data']) && (!is_array($portTracking['data']) || empty($portTracking['data']))
                 ) {
                     $statusCode = 1;
                 } elseif (
