@@ -180,8 +180,7 @@ public function searchShippment(Request $request)
     $shipment = ReservedShipping::with(['user', 'harborFrom', 'harborTo', 'container'])
         ->where('user_id', auth()->id())
         ->where(function ($query) use ($search) {
-            $query->where('track_number', 'LIKE', "%$search%")
-                  ->orWhere('container_no', 'LIKE', "%$search%");
+            $query->where('search_num', 'LIKE', "%$search%");
         })
         ->first();
 
