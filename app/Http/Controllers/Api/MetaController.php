@@ -22,26 +22,27 @@ class MetaController extends Controller
 {
     use HelpersTrait;
     use backendTraits;
-    public function getMetaData()
+   public function getMetaData()
 {
     $user = auth()->user();
 
-    // Update user shipments that are not finalized (status != 3)
+    // Update user's shipments that are not yet finalized
     $shipments = ReservedShipping::where('user_id', $user->id)
         ->where('status', '!=', 3)
         ->get();
 
     foreach ($shipments as $shipment) {
         try {
+            // Skip if required fields are missing
             if (
                 !$shipment->container_no ||
                 !$shipment->carrier_code ||
                 !$shipment->port_code
             ) {
-                continue; // skip invalid shipment
+                continue;
             }
 
-            // Step 1: Get tracking token
+            // Get tracking token
             $tokenResponse = Http::withHeaders([
                 'Content-Type' => 'application/json',
             ])->post('https://prod-api.4portun.com/openapi/auth/token', [
@@ -62,7 +63,7 @@ class MetaController extends Controller
                 'Authorization' => $authToken,
             ];
 
-            // Step 2: Port Tracking Request
+            // Port tracking request
             $portPayload = [
                 'mmsi' => $shipment->subscription_id,
                 'berthTimeStart' => $shipment->berth_start,
@@ -76,8 +77,8 @@ class MetaController extends Controller
                 ? $portResponse->json()
                 : [];
 
-            // Step 3: Vessel Tracking Request (only used if port tracking is incomplete)
-            $payload1 = [
+            // Vessel tracking request
+            $vesselPayload = [
                 'mmsi' => $shipment->subscription_id,
                 'billNo' => $shipment->track_number ?? '',
                 'containerNo' => $shipment->container_no,
@@ -88,18 +89,16 @@ class MetaController extends Controller
             ];
 
             $vesselResponse = Http::withHeaders($headers)
-                ->post("https://prod-api.4portun.com/openapi/gateway/api/ais/vessel-location", $payload1);
+                ->post("https://prod-api.4portun.com/openapi/gateway/api/ais/vessel-location", $vesselPayload);
 
             $vesselTracking = $vesselResponse->successful()
                 ? $vesselResponse->json()
                 : [];
 
-            // Step 4: Determine new status
+            // Determine status
             $statusCode = $shipment->status;
 
-            if ($shipment->status === 0) {
-                $statusCode = 0;
-            } elseif ($shipment->status === 3) {
+            if ($shipment->status === 3) {
                 $statusCode = 3;
             } elseif (
                 isset($portTracking['code']) && $portTracking['code'] === 200
@@ -111,15 +110,22 @@ class MetaController extends Controller
                 } elseif (is_array($portData) && !empty($portData)) {
                     $statusCode = 2;
                 } elseif (is_null($portData)) {
-                    // if data key is missing completely
-                    $statusCode = 1;
+                    $statusCode = 1; // data key is missing, treat as empty
                 }
+            } elseif (
+                isset($vesselTracking['code']) && $vesselTracking['code'] === 200 &&
+                isset($vesselTracking['data']) && !empty($vesselTracking['data'])
+            ) {
+                $statusCode = 1; // fallback when port tracking fails
+            } else {
+                $statusCode = 0; // default if all tracking failed
             }
 
-            // Only update if the new status differs
-            if ($shipment->status != $statusCode) {
+            // Save only if changed and not already status 3
+            if ($shipment->status !== 3 && $shipment->status != $statusCode) {
                 $shipment->status = $statusCode;
                 $shipment->save();
+                \Log::info("Updated shipment ID {$shipment->id} to status {$statusCode}");
             }
 
         } catch (\Exception $e) {
@@ -128,7 +134,7 @@ class MetaController extends Controller
         }
     }
 
-    // Return Meta Data as usual
+    // Return all metadata as normal
     $data['commission'] = Commission::all();
     $data['country'] = Country::all();
     $data['apps'] = AppCategory::with('apps')->get();
@@ -140,5 +146,6 @@ class MetaController extends Controller
 
     return $this->returnData('meta_data', $data, "Meta Data Returned");
 }
+
 
 }
