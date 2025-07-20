@@ -165,82 +165,77 @@ public function searchShippment(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'bill_no' => 'required|string',
-        'port_code' => 'required|string',
-        'is_export' => 'required|string', // 'E' or 'I'
-        // Optionally: 'yard_code' and 'carrier_code' if needed for some ports
     ]);
-
     if ($validator->fails()) {
         return response()->json([
             'code' => 422,
-            'message' => 'Validation error: bill_no, port_code, and is_export are required',
+            'message' => 'Validation error: bill_no is required',
             'errors' => $validator->errors()
         ], 422);
     }
 
-    try {
-        // 1. Get Auth Token
-        $tokenResponse = Http::withHeaders([
-            'Content-Type' => 'application/json',
-        ])->post('https://prod-api.4portun.com/openapi/auth/token', [
-            'appId' => config('services.ocean_tracking.app_id'),
-            'secret' => config('services.ocean_tracking.secret'),
-        ]);
-        $authToken = $tokenResponse->json()['data'];
+    $billNo = $request->input('bill_no');
+    // List of ports to try (from docs). Add/remove as per your supported regions.
+    $portCodes = ['CNSHA', 'CNNGB', 'CNYTN', 'CNSHK', 'CNCWN', 'CNDC', 'CNTAO', 'CNCAN'];
+    $isExports = ['E', 'I']; // Export or Import
 
-        $headers = [
-            'Content-Type' => 'application/json',
-            'appId' => config('services.ocean_tracking.app_id'),
-            'Authorization' => $authToken,
-        ];
+    // Get Auth Token
+    $tokenResponse = Http::withHeaders([
+        'Content-Type' => 'application/json',
+    ])->post('https://prod-api.4portun.com/openapi/auth/token', [
+        'appId' => config('services.ocean_tracking.app_id'),
+        'secret' => config('services.ocean_tracking.secret'),
+    ]);
+    $authToken = $tokenResponse->json()['data'];
+    $headers = [
+        'Content-Type' => 'application/json',
+        'appId' => config('services.ocean_tracking.app_id'),
+        'Authorization' => $authToken,
+    ];
 
-        // 2. Call China EIR-Subscription API with Bill Number
-        $eirPayload = [
-            'billNo' => $request->input('bill_no'),
-            'portCode' => $request->input('port_code'),
-            'isExport' => $request->input('is_export'),
-            'yardCode' => $request->input('yard_code', ''),
-            'carrierCode' => $request->input('carrier_code', ''),
-        ];
+    $found = false;
+    $eirJson = null;
 
-        $eirResponse = Http::withHeaders($headers)
-            ->post('https://prod-api.4portun.com/api/cn-eir/subscribe', $eirPayload);
+    foreach ($portCodes as $portCode) {
+        foreach ($isExports as $isExport) {
+            $eirPayload = [
+                'billNo' => $billNo,
+                'portCode' => $portCode,
+                'isExport' => $isExport,
+                'yardCode' => '',
+                'carrierCode' => '',
+            ];
 
-        $eirJson = $eirResponse->json();
+            $eirResponse = Http::withHeaders($headers)
+                ->post('https://prod-api.4portun.com/api/cn-eir/subscribe', $eirPayload);
 
-        if (($eirJson['code'] ?? 500) != 200 || empty($eirJson['data']['subscriptionId'])) {
-            return response()->json([
-                'code' => $eirJson['code'] ?? 500,
-                'message' => $eirJson['message'] ?? 'Could not subscribe with this bill number',
-                'data' => $eirJson['data'] ?? null,
-            ], 404);
+            $eirJson = $eirResponse->json();
+            if (($eirJson['code'] ?? 500) == 200 && !empty($eirJson['data']['subscriptionId'])) {
+                $found = true;
+                break 2;
+            }
         }
-
-        $subscriptionId = $eirJson['data']['subscriptionId'];
-
-        // 3. Query Tracking Details via getOceanTracking API
-        $trackPayload = ['subscriptionId' => $subscriptionId];
-        $trackResponse = Http::withHeaders($headers)
-            ->post('https://prod-api.4portun.com/api/v2/getOceanTracking', $trackPayload);
-
-        $trackJson = $trackResponse->json();
-
-        // Optionally fetch vessel info or location if needed
-        // Example (not always needed):
-        // $vesselName = $trackJson['data']['firstVessel']['vessel'] ?? null;
-
-        return response()->json([
-            'tracking' => $trackJson,
-            'eir' => $eirJson,
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error('SearchShipment Exception: ' . $e->getMessage());
-        return response()->json([
-            'code' => 500,
-            'message' => 'Internal error while processing shipment tracking.',
-        ], 500);
     }
+
+    if (!$found) {
+        return response()->json([
+            'code' => $eirJson['code'] ?? 404,
+            'message' => $eirJson['message'] ?? 'Shipment not found using bill number.',
+        ], 404);
+    }
+
+    $subscriptionId = $eirJson['data']['subscriptionId'];
+
+    // Get tracking info
+    $trackPayload = ['subscriptionId' => $subscriptionId];
+    $trackResponse = Http::withHeaders($headers)
+        ->post('https://prod-api.4portun.com/api/v2/getOceanTracking', $trackPayload);
+    $trackJson = $trackResponse->json();
+
+    return response()->json([
+        'tracking' => $trackJson,
+        'eir' => $eirJson,
+    ]);
 }
 
 
