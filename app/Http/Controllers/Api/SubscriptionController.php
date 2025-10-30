@@ -118,8 +118,7 @@ public function searchShippment(Request $request)
             'carrierCd' => $request->input('carrier_code')
         ]]);
         $result = $searchResponse->json();
-        dd($result);
-        if ($result['code'] !== 200 || empty($result['result'])) {
+        if (empty($result['result'])) {
             return response()->json([
                 'code' => 404,
                 'message' => 'Shipment not found'
