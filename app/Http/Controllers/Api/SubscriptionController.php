@@ -118,7 +118,7 @@ public function searchShippment(Request $request)
             'carrierCd' => $request->input('carrier_code')
         ]]);
         $result = $searchResponse->json();
-        if (empty($result['result'])) {
+        if ($result['code'] !== 200 || empty($result['result'])) {
             return response()->json([
                 'code' => 404,
                 'message' => 'Shipment not found'
@@ -213,6 +213,87 @@ public function getTrackedShippingByID(Request $status, $id)
             'shipping' => $shipment,
             'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
         ]);
+    }
+}
+
+public function saveShipment(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'bill_no' => 'required|string',
+        'carrier_code' => 'required|string',
+        'save' => 'boolean'
+    ]);
+    
+    if ($validator->fails()) {
+        return response()->json([
+            'code' => 422,
+            'message' => 'Validation error',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    $save = $request->input('save', true);
+    if (!$save) {
+        return response()->json(['code' => 200, 'message' => 'Shipment not saved']);
+    }
+
+    try {
+        // Check if already exists
+        $existing = ReservedShipping::where('user_id', auth()->id())
+            ->where('track_number', $request->input('bill_no'))
+            ->where('carrier_code', $request->input('carrier_code'))
+            ->first();
+            
+        if ($existing) {
+            return response()->json(['code' => 409, 'message' => 'Shipment already saved'], 409);
+        }
+
+        // Get auth token
+        $tokenResponse = Http::post('https://api.trackingeyes.com/api/auth/authorization', [
+            'companyCode' => 100220,
+            'secret' => '2d038e6d-07ae-4354-aebf-f924c198e9c2'
+        ]);
+
+        $authToken = $tokenResponse->json()['result'] ?? null;
+        if (!$authToken) {
+            return response()->json(['code' => 401, 'message' => 'Authentication failed'], 401);
+        }
+
+        // Get shipment details
+        $searchResponse = Http::post('https://api.trackingeyes.com/api/oceanbill/batchOceanBill?companyCode=100220&token=' . $authToken, [[
+            'referenceNo' => $request->input('bill_no'),
+            'blType' => 'BL',
+            'carrierCd' => $request->input('carrier_code')
+        ]]);
+
+        $result = $searchResponse->json();
+        if (empty($result['result'])) {
+            return response()->json(['code' => 404, 'message' => 'Shipment not found'], 404);
+        }
+
+        $shipmentData = $result['result'][0];
+        
+        // Save to database
+        $shipping = ReservedShipping::create([
+            'user_id' => auth()->id(),
+            'track_number' => $request->input('bill_no'),
+            'carrier_code' => $request->input('carrier_code'),
+            'subscription_id' => $shipmentData['id'] ?? null,
+            'container_no' => $shipmentData['ctnrNo'] ?? null,
+            'status' => 0,
+            'reservation_string' => Str::random(10)
+        ]);
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Shipment saved successfully',
+            'data' => $shipping
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'code' => 500,
+            'message' => 'Failed to save shipment: ' . $e->getMessage()
+        ], 500);
     }
 }
 
