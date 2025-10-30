@@ -30,7 +30,7 @@ public function canAccessPanel(Panel $panel): bool
     {
         return str_ends_with($this->email, '@tracky.com');
     }
- public function getImageAttribute($val)
+ public function getPathAttribute($val)
     {
         return ($val !== null) ? asset('/'.$val) : "";
 
