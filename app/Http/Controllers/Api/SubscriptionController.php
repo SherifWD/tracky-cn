@@ -112,17 +112,13 @@ public function searchShippment(Request $request)
         }
 
         // Search shipment
-        $searchResponse = Http::withBody(json_encode([[
+        $searchResponse = Http::post('https://api.trackingeyes.com/api/oceanbill/batchOceanBill?companyCode=100220&token=' . $authToken, [[
             'referenceNo' => $request->input('bill_no'),
             'blType' => 'BL',
             'carrierCd' => $request->input('carrier_code')
-        ]]), 'application/json')->get('https://api.trackingeyes.com/api/oceanbill/batchOceanBill', [
-            'companyCode' => 100220,
-            'token' => $authToken
-        ]);
+        ]]);
 
         $result = $searchResponse->json();
-        dd($result);
         if ($result['code'] !== 200 || empty($result['result'])) {
             return response()->json([
                 'code' => 404,
