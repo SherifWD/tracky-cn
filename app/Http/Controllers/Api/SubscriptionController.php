@@ -67,10 +67,9 @@ class SubscriptionController extends Controller
             $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
 
             return [
-                'details' => [
                     'shipping' => $shipment,
                     'tracking' => $tracking,
-                ],
+                
             ];
         } catch (\Throwable $e) {
             Log::error('Tracking Exception', [
