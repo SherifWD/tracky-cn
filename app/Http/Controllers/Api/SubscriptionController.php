@@ -68,17 +68,20 @@ public function getAllTrackedShippings(Request $status)
 
             $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
 
-            $results['shipping'][] = $shipment;
-            $results['tracking'][] = $tracking;
+            $results[] = [
+                'shipping' => $shipment,
+                'tracking' => $tracking,
+            ];
         } catch (\Exception $e) {
             Log::error('Tracking Exception', [
                 'shipment_id' => $shipment->id,
                 'error' => $e->getMessage(),
             ]);
 
-            $results['shipping'] = $shipment;
-            $results['tracking'] = ['code' => 500, 'message' => 'Tracking failed']; 
-                
+            $results[] = [
+                'shipping' => $shipment,
+                'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
+            ];
         }
     }
 
