@@ -130,7 +130,7 @@ public function searchShippment(Request $request)
         $result['exists'] = $exists;
         
 
-        $billd = $result['result']['id'];
+        $billd = $result['result']->id;
         $detailsResponse = Http::get('https://api.trackingeyes.com/api/oceanbill/oceanBill', [
             'companyCode' => 100220,
             'token' => $authToken,
