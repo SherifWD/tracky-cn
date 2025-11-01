@@ -68,7 +68,7 @@ public function getAllTrackedShippings(Request $status)
 
             $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
 
-            $results['details'] = [
+            $results[] = [
                 'shipping' => $shipment,
                 'tracking' => $tracking,
             ];
@@ -85,7 +85,7 @@ public function getAllTrackedShippings(Request $status)
         }
     }
 
-return $this->returnData('data',$results,'Searched');
+return $this->returnData('data', array_values($results), 'Searched');
 }
 
 public function searchShippment(Request $request)
