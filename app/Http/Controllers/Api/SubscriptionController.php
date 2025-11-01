@@ -68,7 +68,8 @@ public function getAllTrackedShippings(Request $status)
 
             $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
 
-            
+            $results['shipping'] = $shipment;
+            $results['tracking'] = $tracking;
         } catch (\Exception $e) {
             Log::error('Tracking Exception', [
                 'shipment_id' => $shipment->id,
