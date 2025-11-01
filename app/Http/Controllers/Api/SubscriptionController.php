@@ -14,79 +14,86 @@ use App\Traits\HelpersTrait;
 class SubscriptionController extends Controller
 {
     use HelpersTrait;
-    use backendTraits;
-public function getAllTrackedShippings(Request $status)
+    use backendTraits;public function getAllTrackedShippings(Request $request)
 {
-    $status = $status->query('status');
-    $shippings = ReservedShipping::with([
-        'user',
-        'harborFrom',
-        'harborTo',
-        'container'
-    ])->where('user_id',auth()->id());
+    $status = $request->query('status');
+
+    $query = ReservedShipping::with(['user', 'harborFrom', 'harborTo', 'container'])
+        ->where('user_id', auth()->id());
+
     if (!is_null($status)) {
-        $shippings->where('status', '!=', $status);
+        $query->where('status', '!=', $status);
     }
 
-    $shippings = $shippings->get();
-    $results = [];
-
-    foreach ($shippings as $shipment) {
+    $results = $query->get()->map(function ($shipment) {
         try {
+            // Validate required fields
             if (!$shipment->track_number || !$shipment->carrier_code) {
-                $results[] = [
-                    'shipping' => $shipment,
-                    'tracking' => [
-                        'code' => 422,
-                        'message' => 'Missing required tracking fields (track_number, carrier_code).',
+                return [
+                    'details' => [
+                        'shipping' => $shipment,
+                        'tracking' => [
+                            'code' => 422,
+                            'message' => 'Missing required tracking fields (track_number, carrier_code).',
+                        ],
                     ],
                 ];
-                continue;
             }
 
-            // Get auth token
+            // Auth
             $tokenResponse = Http::post('https://api.trackingeyes.com/api/auth/authorization', [
                 'companyCode' => 100220,
-                'secret' => '2d038e6d-07ae-4354-aebf-f924c198e9c2'
+                'secret'      => '2d038e6d-07ae-4354-aebf-f924c198e9c2',
             ]);
 
-            $authToken = $tokenResponse->json()['result'] ?? null;
+            $authToken = data_get($tokenResponse->json(), 'result');
+
             if (!$authToken) {
-                $results[] = [
-                    'shipping' => $shipment,
-                    'tracking' => ['code' => 401, 'message' => 'Authentication failed'],
+                return [
+                    'details' => [
+                        'shipping' => $shipment,
+                        'tracking' => ['code' => 401, 'message' => 'Authentication failed'],
+                    ],
                 ];
-                continue;
             }
 
-            // Get shipment details
+            // Shipment details
             $detailsResponse = Http::get('https://api.trackingeyes.com/api/oceanbill/oceanBill', [
                 'companyCode' => 100220,
-                'token' => $authToken,
-                'billId' => $shipment->subscription_id
+                'token'       => $authToken,
+                'billId'      => $shipment->subscription_id,
             ]);
 
             $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
 
-            $results[] = [
-                'shipping' => $shipment,
-                'tracking' => $tracking,
+            return [
+                'details' => [
+                    'shipping' => $shipment,
+                    'tracking' => $tracking,
+                ],
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Tracking Exception', [
-                'shipment_id' => $shipment->id,
-                'error' => $e->getMessage(),
+                'shipment_id' => $shipment->id ?? null,
+                'error'       => $e->getMessage(),
             ]);
 
-            $results[] = [
-                'shipping' => $shipment,
-                'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
+            return [
+                'details' => [
+                    'shipping' => $shipment,
+                    'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
+                ],
             ];
         }
-    }
+    })->values(); // <<— guarantees a JSON array
 
-return $this->returnData('data', array_values($results), 'Searched');
+    return response()->json([
+        'result' => true,
+        'msg'    => 'Searched',
+        'data'   => $results, // will render as [...] not {"0":...}
+    ], 200, [], JSON_UNESCAPED_UNICODE);
 }
+
 
 public function searchShippment(Request $request)
 {
