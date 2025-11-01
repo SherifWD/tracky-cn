@@ -79,10 +79,9 @@ class SubscriptionController extends Controller
             ]);
 
             return [
-                'details' => [
                     'shipping' => $shipment,
                     'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
-                ],
+                
             ];
         }
     })->values(); // <<— guarantees a JSON array
