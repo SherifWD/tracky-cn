@@ -131,7 +131,6 @@ public function searchShippment(Request $request)
         
 
         $billd = $result['result']['id'];
-dd($billd,$result);
         $detailsResponse = Http::get('https://api.trackingeyes.com/api/oceanbill/oceanBill', [
             'companyCode' => 100220,
             'token' => $authToken,
@@ -150,9 +149,11 @@ dd($billd,$result);
         $position = $positionResponse->successful() ? $positionResponse->json() : [];
 
         return response()->json([
+            'billd' => $billd,
             'result' => $result,
             'tracking' => $tracking,
             'position' => $position,
+            
         ]);
 
 
