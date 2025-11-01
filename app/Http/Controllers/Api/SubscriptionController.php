@@ -9,9 +9,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-
+use App\Traits\backendTraits;
+use App\Traits\HelpersTrait;
 class SubscriptionController extends Controller
 {
+    use HelpersTrait;
+    use backendTraits;
 public function getAllTrackedShippings(Request $status)
 {
     $status = $status->query('status');
@@ -82,7 +85,7 @@ public function getAllTrackedShippings(Request $status)
         }
     }
 
-    return response()->json($results);
+return $this->returnData('data',$results,'Searched');
 }
 
 public function searchShippment(Request $request)
@@ -147,14 +150,11 @@ public function searchShippment(Request $request)
         ]);
 
         $position = $positionResponse->successful() ? $positionResponse->json() : [];
-
-        return response()->json([
-            'billd' => $billd,
-            'result' => $result,
-            'tracking' => $tracking,
-            'position' => $position,
-            
-        ]);
+        $data['result'] = $result;
+        $data['tracking'] = $tracking;
+        $data['position'] = $position;
+return $this->returnData('data',$data,'Searched');
+        
 
 
 
@@ -231,11 +231,11 @@ public function getTrackedShippingByID(Request $status, $id)
 
         $position = $positionResponse->successful() ? $positionResponse->json() : [];
 
-        return response()->json([
-            'shipping' => $shipment,
-            'tracking' => $tracking,
-            'position' => $position,
-        ]);
+        $data['shipping'] = $shipment;
+        $data['tracking'] = $tracking;
+        $data['position'] = $position;
+return $this->returnData('data',$data,'Searched');
+
     } catch (\Exception $e) {
         Log::error('Tracking Exception', [
             'shipment_id' => $shipment->id,
@@ -316,12 +316,10 @@ public function saveShipment(Request $request)
             'status' => 0,
             'reservation_string' => Str::random(10)
         ]);
+$data['result'] = $shipping;
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'Shipment saved successfully',
-            'data' => $shipping
-        ]);
+return $this->returnData('data',$data,'Searched');
+
     } catch (\Exception $e) {
         return response()->json([
             'code' => 500,
