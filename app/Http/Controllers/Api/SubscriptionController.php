@@ -78,10 +78,9 @@ public function getAllTrackedShippings(Request $status)
                 'error' => $e->getMessage(),
             ]);
 
-            $results[] = [
-                'shipping' => $shipment,
-                'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
-            ];
+            $results['shipping'] = $shipment;
+            $results['tracking'] = ['code' => 500, 'message' => 'Tracking failed']; 
+                
         }
     }
 
@@ -242,10 +241,11 @@ return $this->returnData('data',$data,'Searched');
             'error' => $e->getMessage(),
         ]);
 
-        return response()->json([
-            'shipping' => $shipment,
-            'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
-        ]);
+        return $this->returnData('data',$data,'Searched');
+        // return response()->json([
+        //     'shipping' => $shipment,
+        //     'tracking' => ['code' => 500, 'message' => 'Tracking failed'],
+        // ]);
     }
 }
 
