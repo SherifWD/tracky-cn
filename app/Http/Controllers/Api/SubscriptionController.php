@@ -129,7 +129,35 @@ public function searchShippment(Request $request)
         //add to results variable the result of $exists
         $result['exists'] = $exists;
         
-        return response()->json($result);
+
+
+
+        $detailsResponse = Http::get('https://api.trackingeyes.com/api/oceanbill/oceanBill', [
+            'companyCode' => 100220,
+            'token' => $authToken,
+            'billId' => $request->bill_no
+        ]);
+
+        $tracking = $detailsResponse->successful() ? $detailsResponse->json() : [];
+
+        // Get ship position if available
+        $positionResponse = Http::get('https://api.trackingeyes.com/api/shipPosition/getShipPositionByBlno', [
+            'companyCode' => 100220,
+            'token' => $authToken,
+            'referenceNo' => $request->bill_no
+        ]);
+
+        $position = $positionResponse->successful() ? $positionResponse->json() : [];
+
+        return response()->json([
+            'result' => $result,
+            'tracking' => $tracking,
+            'position' => $position,
+        ]);
+
+
+
+        // return response()->json($result);
     } catch (\Exception $e) {
         return response()->json([
             'code' => 500,
