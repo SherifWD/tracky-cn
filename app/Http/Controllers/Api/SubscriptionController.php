@@ -91,6 +91,8 @@ public function searchShippment(Request $request)
         'bill_no' => 'required|string',
         'carrier_code' => 'required|string',
     ]);
+    $exists = ReservedShipping::where('track_number',$request->bill_no)->where('carrier_code',$request->carrier_code)->where('user_id',auth()->id)->exists();
+
     if ($validator->fails()) {
         return response()->json([
             'code' => 422,
@@ -124,7 +126,9 @@ public function searchShippment(Request $request)
                 'message' => 'Shipment not found'
             ], 404);
         }
-
+        //add to results variable the result of $exists
+        $result['exists'] = $exists;
+        
         return response()->json($result);
     } catch (\Exception $e) {
         return response()->json([
