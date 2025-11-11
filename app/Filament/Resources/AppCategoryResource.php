@@ -3,18 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AppCategoryResource\Pages;
-use App\Filament\Resources\AppCategoryResource\RelationManagers;
+use App\Filament\Resources\AppCategoryResource\RelationManagers\AppsRelationManager;
 use App\Models\AppCategory;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
-use Filament\Infolists\Components\ImageEntry;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Validation\Rules\ImageFile;
 
 class AppCategoryResource extends Resource
 {
@@ -26,17 +21,27 @@ class AppCategoryResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->maxLength(255)
-                    ->default(null),
-                FileUpload::make('icon')
-                ->disk('local')
-    ->directory('images')
-                    ->default(null),
-                    
-                Forms\Components\TextInput::make('description')
-                    ->maxLength(255)
-                    ->default(null),
+                Forms\Components\Section::make('Category Details')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Name')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\FileUpload::make('icon')
+                            ->label('Icon')
+                            ->image()
+                            ->disk('local')
+                            ->directory('images/app-categories')
+                            ->maxSize(2048)
+                            ->helperText('Upload a square image (max 2 MB).'),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Description')
+                            ->rows(4)
+                            ->columnSpanFull()
+                            ->maxLength(255)
+                            ->placeholder('Short description shown in the mobile app.'),
+                    ]),
             ]);
     }
 
@@ -45,12 +50,23 @@ class AppCategoryResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
-                
-                Tables\Columns\ImageColumn::make('icon')->searchable(),
-
+                    ->sortable()
+                    ->searchable()
+                    ->limit(40)
+                    ->wrap(),
+                Tables\Columns\ImageColumn::make('icon')
+                    ->label('Icon')
+                    ->square()
+                    ->height(40)
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('apps_count')
+                    ->counts('apps')
+                    ->label('Apps')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('description')
-                    ->searchable(),
+                    ->toggleable()
+                    ->limit(60)
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -60,6 +76,7 @@ class AppCategoryResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name')
             ->filters([
                 //
             ])
@@ -76,7 +93,7 @@ class AppCategoryResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            AppsRelationManager::class,
         ];
     }
 
