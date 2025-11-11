@@ -32,7 +32,7 @@ class AppCategoryResource extends Resource
                             ->label('Icon')
                             ->image()
                             ->disk('local')
-                            ->directory('images/app-categories')
+                            ->directory('')
                             ->maxSize(2048)
                             ->helperText('Upload a square image (max 2 MB).'),
                         Forms\Components\Textarea::make('description')

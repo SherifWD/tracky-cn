@@ -27,7 +27,7 @@ class ShippingLineIconResource extends Resource
                             ->required()
                             ->image()
                             ->disk('local')
-                            ->directory('images/shipping-line-icons')
+                            ->directory('images')
                             ->maxSize(2048)
                             ->helperText('PNG/SVG under 2 MB stored under /public/images/shipping-line-icons'),
                     ]),
