@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class ReservedShipping extends Model
 {
     protected $guarded =[];
+    protected $casts = [
+        'saved_via_search' => 'boolean',
+    ];
     public function container()
 {
     return $this->belongsTo(ShippingContainer::class, 'container_id');
