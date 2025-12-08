@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class ShippingContainer extends Model
 {
-    protected $guarded =[];
-    
+    protected $guarded = [];
+
+    public function getImageAttribute($val)
+    {
+        return $val !== null ? asset($val) : '';
+    }
 }

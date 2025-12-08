@@ -24,8 +24,16 @@ class ShippingContainerResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('size')
+                    ->label('Size')
                     ->maxLength(255)
                     ->default(null),
+                Forms\Components\FileUpload::make('image')
+                    ->label('Image')
+                    ->image()
+                    ->disk('local')
+                    ->directory('shipping-containers')
+                    ->maxSize(2048)
+                    ->helperText('Optional container image, max 2 MB.'),
             ]);
     }
 
@@ -33,6 +41,9 @@ class ShippingContainerResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('image')
+                    ->label('Image')
+                    ->height(56),
                 Tables\Columns\TextColumn::make('size')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
