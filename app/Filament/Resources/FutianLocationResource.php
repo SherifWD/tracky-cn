@@ -32,7 +32,7 @@ class FutianLocationResource extends Resource
                 Forms\Components\FileUpload::make('image')
                     ->image()
                     ->disk('local')
-                    ->directory('futian-locations')
+                    ->directory('images')
                     ->maxSize(2048)
                     ->helperText('Upload an image up to 2 MB.'),
                 Forms\Components\TextInput::make('radius')
