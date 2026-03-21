@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FutianLocation extends Model
@@ -27,6 +28,14 @@ class FutianLocation extends Model
 
     public function getImageAttribute($val)
     {
-        return ($val !== null && $val !== '') ? asset($val) : '';
+        if ($val === null || $val === '') {
+            return '';
+        }
+
+        if (filter_var($val, FILTER_VALIDATE_URL)) {
+            return $val;
+        }
+
+        return Storage::disk('local')->url(ltrim($val, '/'));
     }
 }

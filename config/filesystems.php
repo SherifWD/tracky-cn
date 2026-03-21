@@ -33,7 +33,7 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => public_path('/'),
-            'url' => env('APP_URL'),
+            'url' => env('LOCAL_FILESYSTEM_URL', env('APP_URL')),
             'throw' => false,
         ],
         'public' => [
