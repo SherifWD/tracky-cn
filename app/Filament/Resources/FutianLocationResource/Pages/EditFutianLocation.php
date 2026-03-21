@@ -10,6 +10,13 @@ class EditFutianLocation extends EditRecord
 {
     protected static string $resource = FutianLocationResource::class;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $data['image'] = $this->record->getRawOriginal('image');
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [

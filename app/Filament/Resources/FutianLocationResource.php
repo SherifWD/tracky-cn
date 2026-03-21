@@ -12,7 +12,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Str;
 
 class FutianLocationResource extends Resource
 {
@@ -35,24 +34,7 @@ class FutianLocationResource extends Resource
                     ->disk('local')
                     ->directory('futian-locations')
                     ->maxSize(2048)
-                    ->helperText('Upload an image up to 2 MB.')
-                    ->afterStateHydrated(function (Forms\Components\FileUpload $component, $state, ?FutianLocation $record): void {
-                        if (! $record) {
-                            return;
-                        }
-
-                        $component->state($record->getRawOriginal('image'));
-                    })
-                    ->dehydrateStateUsing(function ($state) {
-                        if (! is_string($state) || $state === '') {
-                            return $state;
-                        }
-
-                        return Str::of($state)
-                            ->after(url('/'))
-                            ->ltrim('/')
-                            ->toString();
-                    }),
+                    ->helperText('Upload an image up to 2 MB.'),
                 Forms\Components\TextInput::make('radius')
                     ->maxLength(255)
                     ->default(null),
