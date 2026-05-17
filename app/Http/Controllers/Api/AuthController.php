@@ -8,6 +8,7 @@ use App\Services\TwilioWhatsAppOtpService;
 use App\Traits\backendTraits;
 use App\Traits\HelpersTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
@@ -36,11 +37,15 @@ class AuthController extends Controller
             ->where('country_code', $request->country_code)
             ->first();
 
-        if (! $user) {
-            return $this->returnError('E003', 'User not found. Please register.');
+        if ($user) {
+            return $this->sendOtpResponse($user, 'OTP sent successfully');
         }
 
-        return $this->sendOtpResponse($user, 'OTP sent successfully');
+        return $this->sendPendingOtpResponse(
+            (string) $request->phone,
+            (string) $request->country_code,
+            'OTP sent successfully'
+        );
     }
 
     public function loginValidateOtp(Request $request)
@@ -65,25 +70,30 @@ class AuthController extends Controller
                 ->where('country_code', $request->country_code)
                 ->first();
 
-            if (! $user) {
-                return $this->returnError('E003', 'User not found. Please register.');
+            if ($user && $this->isUserOtpValid($user, (string) $request->otp)) {
+                $user->otp = null;
+                $user->otp_expires_at = null;
+                $user->save();
+
+                $token = JWTAuth::fromUser($user);
+
+                return $this->tokenResponse($user, $token, 'OTP validated successfully');
             }
 
-            if (
-                $user->otp !== (string) $request->otp
-                || blank($user->otp_expires_at)
-                || now()->greaterThan($user->otp_expires_at)
-            ) {
-                return $this->returnError('E002', 'Invalid or expired OTP');
+            if ($this->isPendingOtpValid((string) $request->phone, (string) $request->country_code, (string) $request->otp)) {
+                Cache::forget($this->pendingOtpCacheKey((string) $request->phone, (string) $request->country_code));
+
+                $user ??= User::firstOrCreate([
+                    'phone' => $request->phone,
+                    'country_code' => $request->country_code,
+                ]);
+
+                $token = JWTAuth::fromUser($user);
+
+                return $this->tokenResponse($user, $token, 'OTP validated successfully');
             }
 
-            $user->otp = null;
-            $user->otp_expires_at = null;
-            $user->save();
-
-            $token = JWTAuth::fromUser($user);
-
-            return $this->returnData('token', compact('token', 'user'), 'OTP validated successfully');
+            return $this->returnError('E002', 'Invalid or expired OTP');
         } catch (Throwable $e) {
             Log::error('Error in validateOtp: '.$e->getMessage());
 
@@ -182,7 +192,9 @@ class AuthController extends Controller
             return $this->returnError('E500', 'Token error');
         }
 
-        return $this->returnData('user', $user, 'Authenticated user retrieved successfully');
+        $token = JWTAuth::getToken()?->get();
+
+        return $this->tokenResponse($user, (string) $token, 'Authenticated user retrieved successfully');
     }
 
     public function logout()
@@ -219,5 +231,61 @@ class AuthController extends Controller
             'user' => $user,
             'otp_expires_at' => $user->otp_expires_at?->toIso8601String(),
         ], $message);
+    }
+
+    private function sendPendingOtpResponse(string $phone, string $countryCode, string $message)
+    {
+        $otp = (string) random_int(10000, 99999);
+        $expiresAt = now()->addMinutes((int) config('services.twilio.otp_ttl', 10));
+        $cacheKey = $this->pendingOtpCacheKey($phone, $countryCode);
+
+        Cache::put($cacheKey, [
+            'otp' => $otp,
+            'expires_at' => $expiresAt->toIso8601String(),
+        ], $expiresAt);
+
+        try {
+            $this->sendOtp($phone, $countryCode, $otp);
+        } catch (Throwable $e) {
+            Cache::forget($cacheKey);
+
+            Log::error('Error sending OTP: '.$e->getMessage());
+
+            return $this->returnError('E500', 'Failed to send OTP. Please try again.');
+        }
+
+        return $this->returnData('user', [
+            'user' => null,
+            'phone' => $phone,
+            'country_code' => $countryCode,
+            'otp_expires_at' => $expiresAt->toIso8601String(),
+        ], $message);
+    }
+
+    private function isUserOtpValid(User $user, string $otp): bool
+    {
+        return $user->otp === $otp
+            && filled($user->otp_expires_at)
+            && now()->lessThanOrEqualTo($user->otp_expires_at);
+    }
+
+    private function isPendingOtpValid(string $phone, string $countryCode, string $otp): bool
+    {
+        $pendingOtp = Cache::get($this->pendingOtpCacheKey($phone, $countryCode));
+
+        return is_array($pendingOtp)
+            && ($pendingOtp['otp'] ?? null) === $otp
+            && filled($pendingOtp['expires_at'] ?? null)
+            && now()->lessThanOrEqualTo($pendingOtp['expires_at']);
+    }
+
+    private function pendingOtpCacheKey(string $phone, string $countryCode): string
+    {
+        return 'auth:pending-otp:'.sha1(trim($countryCode).'|'.trim($phone));
+    }
+
+    private function tokenResponse(User $user, string $token, string $message)
+    {
+        return $this->returnData('token', compact('token', 'user'), $message);
     }
 }

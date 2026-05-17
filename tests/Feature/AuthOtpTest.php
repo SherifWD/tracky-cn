@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\TwilioWhatsAppOtpService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
@@ -20,6 +21,8 @@ class AuthOtpTest extends TestCase
             'jwt.secret' => str_repeat('a', 64),
             'services.twilio.otp_ttl' => 10,
         ]);
+
+        Cache::flush();
 
         Schema::dropIfExists('users');
         Schema::create('users', function (Blueprint $table) {
@@ -79,6 +82,41 @@ class AuthOtpTest extends TestCase
         $this->assertNotNull($user->otp_expires_at);
     }
 
+    public function test_login_sends_whatsapp_otp_for_unknown_phone_without_creating_user(): void
+    {
+        $sentOtp = null;
+
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01099999999', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
+                    $sentOtp = $otp;
+
+                    return is_string($otp) && preg_match('/^\d{5}$/', $otp) === 1;
+                }))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $response = $this->postJson('/api/auth/login', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'OTP sent successfully')
+            ->assertJsonPath('data.user', null)
+            ->assertJsonPath('data.phone', '01099999999')
+            ->assertJsonPath('data.country_code', '+20');
+
+        $this->assertNotNull($sentOtp);
+        $this->assertDatabaseMissing('users', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ]);
+    }
+
     public function test_validate_otp_returns_jwt_and_clears_login_otp(): void
     {
         $user = User::create([
@@ -114,6 +152,85 @@ class AuthOtpTest extends TestCase
         $this->assertNull($user->otp);
         $this->assertNull($user->otp_expires_at);
         $this->assertSame('12345', $user->tmp_otp);
+    }
+
+    public function test_validate_otp_registers_unknown_phone_when_pending_otp_is_correct(): void
+    {
+        $sentOtp = null;
+
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01099999999', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
+                    $sentOtp = $otp;
+
+                    return is_string($otp) && preg_match('/^\d{5}$/', $otp) === 1;
+                }))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/auth/login/validate-otp', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+            'otp' => $sentOtp,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'OTP validated successfully')
+            ->assertJsonPath('data.user.phone', '01099999999')
+            ->assertJsonPath('data.user.country_code', '+20')
+            ->assertJsonStructure([
+                'data' => [
+                    'token',
+                    'user',
+                ],
+            ]);
+
+        $this->assertNotNull($response->json('data.token'));
+        $this->assertDatabaseHas('users', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ]);
+        $this->assertArrayNotHasKey('otp', $response->json('data.user'));
+        $this->assertArrayNotHasKey('tmp_otp', $response->json('data.user'));
+    }
+
+    public function test_validate_otp_does_not_register_unknown_phone_when_pending_otp_is_wrong(): void
+    {
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01099999999', '+20', Mockery::type('string'))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/auth/login/validate-otp', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+            'otp' => '00000',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', false)
+            ->assertJsonPath('msg', 'Invalid or expired OTP');
+
+        $this->assertDatabaseMissing('users', [
+            'phone' => '01099999999',
+            'country_code' => '+20',
+        ]);
     }
 
     public function test_auto_login_returns_same_token_and_user_shape_as_otp_validation(): void
