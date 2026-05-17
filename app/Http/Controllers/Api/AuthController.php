@@ -38,7 +38,7 @@ class AuthController extends Controller
         $user = $this->findUserByPhone($phone, $countryCode);
 
         if ($user) {
-            return $this->sendOtpResponse($user, 'OTP sent successfully');
+            return $this->sendOtpResponse($user, 'OTP sent successfully', $phone, $countryCode);
         }
 
         return $this->sendPendingOtpResponse(
@@ -84,10 +84,7 @@ class AuthController extends Controller
             if ($this->isPendingOtpValid($phone, $countryCode, $otp)) {
                 Cache::forget($this->pendingOtpCacheKey($phone, $countryCode));
 
-                $user ??= User::firstOrCreate([
-                    'phone' => trim($phone),
-                    'country_code' => trim($countryCode),
-                ]);
+                $user ??= $this->firstOrCreateUserByPhone($phone, $countryCode);
 
                 $token = JWTAuth::fromUser($user);
 
@@ -205,7 +202,7 @@ class AuthController extends Controller
         return $this->returnSuccessMessage('User successfully logged out');
     }
 
-    private function sendOtpResponse(User $user, string $message)
+    private function sendOtpResponse(User $user, string $message, ?string $phone = null, ?string $countryCode = null)
     {
         $otp = (string) random_int(10000, 99999);
         $user->otp = $otp;
@@ -214,7 +211,7 @@ class AuthController extends Controller
         $user->save();
 
         try {
-            $this->sendOtp($user->phone, $user->country_code, $otp);
+            $this->sendOtp($phone ?? $user->phone, $countryCode ?? $user->country_code, $otp);
         } catch (Throwable $e) {
             $user->otp = null;
             $user->tmp_otp = null;
@@ -309,7 +306,26 @@ class AuthController extends Controller
 
         return User::whereIn('phone', $phoneVariants)
             ->whereIn('country_code', $countryCodeVariants)
-            ->first();
+            ->first()
+            ?? User::whereIn('phone', $phoneVariants)
+                ->first();
+    }
+
+    private function firstOrCreateUserByPhone(string $phone, string $countryCode): User
+    {
+        $phone = trim($phone);
+        $countryCode = trim($countryCode);
+
+        $user = $this->findUserByPhone($phone, $countryCode);
+
+        if ($user) {
+            return $user;
+        }
+
+        return User::firstOrCreate(
+            ['phone' => $phone],
+            ['country_code' => $countryCode],
+        );
     }
 
     private function phoneVariants(string $phone, string $countryCode): array

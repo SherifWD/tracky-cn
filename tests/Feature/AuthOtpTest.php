@@ -117,6 +117,39 @@ class AuthOtpTest extends TestCase
         ]);
     }
 
+    public function test_login_uses_existing_user_when_phone_exists_with_different_country_code_format(): void
+    {
+        $user = User::create([
+            'phone' => '01006138028',
+            'country_code' => '20',
+        ]);
+
+        $sentOtp = null;
+
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01006138028', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
+                    $sentOtp = $otp;
+
+                    return is_string($otp) && preg_match('/^\d{5}$/', $otp) === 1;
+                }))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $response = $this->postJson('/api/auth/login', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('data.user.id', $user->id);
+
+        $this->assertSame($sentOtp, $user->refresh()->otp);
+    }
+
     public function test_validate_otp_returns_jwt_and_clears_login_otp(): void
     {
         $user = User::create([
@@ -214,6 +247,37 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('msg', 'OTP validated successfully')
             ->assertJsonPath('data.user.phone', '1099999999')
             ->assertJsonPath('data.user.country_code', '20');
+    }
+
+    public function test_validate_otp_uses_existing_user_if_pending_otp_exists_for_duplicate_phone(): void
+    {
+        $user = User::create([
+            'phone' => '01006138028',
+            'country_code' => '20',
+        ]);
+
+        Cache::put(
+            'auth:pending-otp:'.sha1('+201006138028'),
+            [
+                'otp' => '55317',
+                'expires_at' => now()->addMinutes(10)->toIso8601String(),
+            ],
+            now()->addMinutes(10)
+        );
+
+        $response = $this->postJson('/api/auth/login/validate-otp', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+            'otp' => '55317',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'OTP validated successfully')
+            ->assertJsonPath('data.user.id', $user->id);
+
+        $this->assertSame(1, User::where('phone', '01006138028')->count());
     }
 
     public function test_validate_otp_registers_unknown_phone_when_pending_otp_is_correct(): void
