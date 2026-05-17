@@ -33,17 +33,17 @@ class AuthController extends Controller
             return $this->returnValidationError('E001', $validator);
         }
 
-        $user = User::where('phone', $request->phone)
-            ->where('country_code', $request->country_code)
-            ->first();
+        $phone = (string) $request->phone;
+        $countryCode = (string) $request->country_code;
+        $user = $this->findUserByPhone($phone, $countryCode);
 
         if ($user) {
             return $this->sendOtpResponse($user, 'OTP sent successfully');
         }
 
         return $this->sendPendingOtpResponse(
-            (string) $request->phone,
-            (string) $request->country_code,
+            $phone,
+            $countryCode,
             'OTP sent successfully'
         );
     }
@@ -66,11 +66,12 @@ class AuthController extends Controller
         }
 
         try {
-            $user = User::where('phone', $request->phone)
-                ->where('country_code', $request->country_code)
-                ->first();
+            $phone = (string) $request->phone;
+            $countryCode = (string) $request->country_code;
+            $otp = $this->normalizeOtp((string) $request->otp);
+            $user = $this->findUserByPhone($phone, $countryCode);
 
-            if ($user && $this->isUserOtpValid($user, (string) $request->otp)) {
+            if ($user && $this->isUserOtpValid($user, $otp)) {
                 $user->otp = null;
                 $user->otp_expires_at = null;
                 $user->save();
@@ -80,12 +81,12 @@ class AuthController extends Controller
                 return $this->tokenResponse($user, $token, 'OTP validated successfully');
             }
 
-            if ($this->isPendingOtpValid((string) $request->phone, (string) $request->country_code, (string) $request->otp)) {
-                Cache::forget($this->pendingOtpCacheKey((string) $request->phone, (string) $request->country_code));
+            if ($this->isPendingOtpValid($phone, $countryCode, $otp)) {
+                Cache::forget($this->pendingOtpCacheKey($phone, $countryCode));
 
                 $user ??= User::firstOrCreate([
-                    'phone' => $request->phone,
-                    'country_code' => $request->country_code,
+                    'phone' => trim($phone),
+                    'country_code' => trim($countryCode),
                 ]);
 
                 $token = JWTAuth::fromUser($user);
@@ -282,11 +283,84 @@ class AuthController extends Controller
 
     private function pendingOtpCacheKey(string $phone, string $countryCode): string
     {
-        return 'auth:pending-otp:'.sha1(trim($countryCode).'|'.trim($phone));
+        return 'auth:pending-otp:'.sha1($this->normalizeFullPhoneNumber($phone, $countryCode));
     }
 
     private function tokenResponse(User $user, string $token, string $message)
     {
         return $this->returnData('token', compact('token', 'user'), $message);
+    }
+
+    private function findUserByPhone(string $phone, string $countryCode): ?User
+    {
+        $phone = trim($phone);
+        $countryCode = trim($countryCode);
+
+        $user = User::where('phone', $phone)
+            ->where('country_code', $countryCode)
+            ->first();
+
+        if ($user) {
+            return $user;
+        }
+
+        $phoneVariants = $this->phoneVariants($phone, $countryCode);
+        $countryCodeVariants = $this->countryCodeVariants($countryCode);
+
+        return User::whereIn('phone', $phoneVariants)
+            ->whereIn('country_code', $countryCodeVariants)
+            ->first();
+    }
+
+    private function phoneVariants(string $phone, string $countryCode): array
+    {
+        $phone = trim($phone);
+        $phoneDigits = preg_replace('/\D+/', '', $phone);
+        $countryDigits = preg_replace('/\D+/', '', $countryCode);
+        $localDigits = $phoneDigits;
+
+        if ($countryDigits !== '' && str_starts_with($phoneDigits, $countryDigits)) {
+            $localDigits = substr($phoneDigits, strlen($countryDigits));
+        }
+
+        $localWithoutLeadingZero = ltrim($localDigits, '0');
+
+        return array_values(array_filter(array_unique([
+            $phone,
+            $phoneDigits,
+            '+'.$phoneDigits,
+            $localDigits,
+            $localWithoutLeadingZero,
+            '0'.$localWithoutLeadingZero,
+        ])));
+    }
+
+    private function countryCodeVariants(string $countryCode): array
+    {
+        $countryCode = trim($countryCode);
+        $countryDigits = preg_replace('/\D+/', '', $countryCode);
+
+        return array_values(array_filter(array_unique([
+            $countryCode,
+            $countryDigits,
+            '+'.$countryDigits,
+        ])));
+    }
+
+    private function normalizeFullPhoneNumber(string $phone, string $countryCode): string
+    {
+        $phoneDigits = preg_replace('/\D+/', '', trim($phone));
+        $countryDigits = preg_replace('/\D+/', '', trim($countryCode));
+
+        if ($countryDigits !== '' && str_starts_with($phoneDigits, $countryDigits)) {
+            return '+'.$phoneDigits;
+        }
+
+        return '+'.$countryDigits.ltrim($phoneDigits, '0');
+    }
+
+    private function normalizeOtp(string $otp): string
+    {
+        return preg_replace('/\D+/', '', trim($otp));
     }
 }
