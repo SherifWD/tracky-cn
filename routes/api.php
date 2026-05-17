@@ -1,17 +1,18 @@
 <?php
 
-use App\Http\Controllers\Api\SubscriptionController;
-use App\Http\Controllers\Api\UserFlowController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MetaController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\UserFlowController;
 use App\Http\Middleware\JwtMiddleware;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
 
 // Authentication Routes
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('validate-otp', [AuthController::class, 'validateOtp']);
+    Route::post('login/validate-otp', [AuthController::class, 'loginValidateOtp']);
 });
 
 Route::prefix('auth')->middleware([JwtMiddleware::class])->group(function () {
@@ -20,7 +21,7 @@ Route::prefix('auth')->middleware([JwtMiddleware::class])->group(function () {
     Route::get('auto-login', [AuthController::class, 'getAuthenticatedUser']);
 });
 
-Route::group(['middleware' => 'jwt.verify'], function() {
+Route::group(['middleware' => 'jwt.verify'], function () {
     Route::get('meta-data', [MetaController::class, 'getMetaData']);
     Route::post('reserve-translator', [UserFlowController::class, 'reserveTranslator']);
     Route::post('calculate-reservation', [UserFlowController::class, 'calculateReservationPrice']);
@@ -28,15 +29,12 @@ Route::group(['middleware' => 'jwt.verify'], function() {
     Route::post('receipt-payment', [UserFlowController::class, 'ReceiptPayment']);
     Route::post('calculate-price-container', [UserFlowController::class, 'getPriceContainerByHarbor']);
     Route::post('reserve-container', [UserFlowController::class, 'reserveShipping']);
-Route::get('/shippings/tracked', [SubscriptionController::class, 'getAllTrackedShippings']);
-Route::get('/shippings/tracked/{id}', [SubscriptionController::class, 'getTrackedShippingByID']);
-Route::post('/save-shippment', [SubscriptionController::class, 'saveShipment']);
-Route::post('/search-shipment', [SubscriptionController::class, 'searchShippment']);
-Route::post('/currency-rates', [UserFlowController::class, 'getRates']);
-Route::post('/container-price-by-harbor', [UserFlowController::class, 'getPrices']);
-Route::get('/futian-locations', [UserFlowController::class, 'futianLocations']);
-
+    Route::get('/shippings/tracked', [SubscriptionController::class, 'getAllTrackedShippings']);
+    Route::get('/shippings/tracked/{id}', [SubscriptionController::class, 'getTrackedShippingByID']);
+    Route::post('/save-shippment', [SubscriptionController::class, 'saveShipment']);
+    Route::post('/search-shipment', [SubscriptionController::class, 'searchShippment']);
+    Route::post('/currency-rates', [UserFlowController::class, 'getRates']);
+    Route::post('/container-price-by-harbor', [UserFlowController::class, 'getPrices']);
+    Route::get('/futian-locations', [UserFlowController::class, 'futianLocations']);
 
 });
-
-?>
