@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthOtpTest extends TestCase
 {
@@ -113,5 +114,38 @@ class AuthOtpTest extends TestCase
         $this->assertNull($user->otp);
         $this->assertNull($user->otp_expires_at);
         $this->assertSame('12345', $user->tmp_otp);
+    }
+
+    public function test_auto_login_returns_same_token_and_user_shape_as_otp_validation(): void
+    {
+        $user = User::create([
+            'name' => 'Sherif',
+            'phone' => '01012345678',
+            'country_code' => '+20',
+        ]);
+
+        $token = JWTAuth::fromUser($user);
+
+        $response = $this
+            ->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/auth/auto-login');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'Authenticated user retrieved successfully')
+            ->assertJsonPath('data.token', $token)
+            ->assertJsonPath('data.user.id', $user->id)
+            ->assertJsonPath('data.user.name', 'Sherif')
+            ->assertJsonPath('data.user.phone', '01012345678')
+            ->assertJsonStructure([
+                'data' => [
+                    'token',
+                    'user',
+                ],
+            ]);
+
+        $this->assertArrayNotHasKey('otp', $response->json('data.user'));
+        $this->assertArrayNotHasKey('tmp_otp', $response->json('data.user'));
     }
 }
