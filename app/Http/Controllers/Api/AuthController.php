@@ -258,6 +258,7 @@ class AuthController extends Controller
             'user' => null,
             'phone' => $phone,
             'country_code' => $countryCode,
+            'otp' => $otp,
             'otp_expires_at' => $expiresAt->toIso8601String(),
         ], $message);
     }
