@@ -306,9 +306,7 @@ class AuthController extends Controller
 
         return User::whereIn('phone', $phoneVariants)
             ->whereIn('country_code', $countryCodeVariants)
-            ->first()
-            ?? User::whereIn('phone', $phoneVariants)
-                ->first();
+            ->first();
     }
 
     private function firstOrCreateUserByPhone(string $phone, string $countryCode): User
@@ -322,10 +320,10 @@ class AuthController extends Controller
             return $user;
         }
 
-        return User::firstOrCreate(
-            ['phone' => $phone],
-            ['country_code' => $countryCode],
-        );
+        return User::firstOrCreate([
+            'phone' => $phone,
+            'country_code' => $countryCode,
+        ]);
     }
 
     private function phoneVariants(string $phone, string $countryCode): array

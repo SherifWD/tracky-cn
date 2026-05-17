@@ -39,6 +39,7 @@ class AuthOtpTest extends TestCase
             $table->timestamp('otp_expires_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
+            $table->unique(['phone', 'country_code']);
         });
     }
 
@@ -148,6 +149,35 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('data.user.id', $user->id);
 
         $this->assertSame($sentOtp, $user->refresh()->otp);
+    }
+
+    public function test_login_does_not_match_existing_user_when_same_phone_has_different_country_code(): void
+    {
+        User::create([
+            'name' => 'test',
+            'phone' => '01006138028',
+            'country_code' => '+218',
+        ]);
+
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01006138028', '+20', Mockery::type('string'))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $response = $this->postJson('/api/auth/login', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'OTP sent successfully')
+            ->assertJsonPath('data.user', null)
+            ->assertJsonPath('data.phone', '01006138028')
+            ->assertJsonPath('data.country_code', '+20');
     }
 
     public function test_validate_otp_returns_jwt_and_clears_login_otp(): void
@@ -278,6 +308,56 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('data.user.id', $user->id);
 
         $this->assertSame(1, User::where('phone', '01006138028')->count());
+    }
+
+    public function test_validate_otp_creates_new_user_when_same_phone_has_different_country_code(): void
+    {
+        User::create([
+            'name' => 'test',
+            'phone' => '01006138028',
+            'country_code' => '+218',
+        ]);
+
+        $sentOtp = null;
+
+        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+            $mock->shouldReceive('send')
+                ->once()
+                ->with('01006138028', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
+                    $sentOtp = $otp;
+
+                    return is_string($otp) && preg_match('/^\d{5}$/', $otp) === 1;
+                }))
+                ->andReturn(['success' => true, 'sid' => 'SM123', 'status' => 'queued']);
+        });
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/auth/login/validate-otp', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+            'otp' => $sentOtp,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'OTP validated successfully')
+            ->assertJsonPath('data.user.phone', '01006138028')
+            ->assertJsonPath('data.user.country_code', '+20');
+
+        $this->assertSame(2, User::where('phone', '01006138028')->count());
+        $this->assertDatabaseHas('users', [
+            'phone' => '01006138028',
+            'country_code' => '+218',
+        ]);
+        $this->assertDatabaseHas('users', [
+            'phone' => '01006138028',
+            'country_code' => '+20',
+        ]);
     }
 
     public function test_validate_otp_registers_unknown_phone_when_pending_otp_is_correct(): void
