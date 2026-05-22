@@ -40,6 +40,8 @@ class TwilioWhatsAppOtpService
             $payload['ContentVariables'] = json_encode([
                 config('services.twilio.otp_variable', '1') => $otp,
             ]);
+        } elseif (config('services.twilio.whatsapp_require_template')) {
+            throw new RuntimeException('Twilio WhatsApp Content SID is required for production OTP messages.');
         } else {
             $payload['Body'] = str_replace(':otp', $otp, config('services.twilio.otp_message'));
         }
@@ -49,12 +51,19 @@ class TwilioWhatsAppOtpService
             ->post("https://api.twilio.com/2010-04-01/Accounts/{$accountSid}/Messages.json", $payload);
 
         if ($response->failed()) {
+            $twilioError = $response->json() ?: [];
+
             Log::error('Twilio WhatsApp OTP failed.', [
                 'status' => $response->status(),
-                'response' => $response->json() ?: $response->body(),
+                'code' => $twilioError['code'] ?? null,
+                'message' => $twilioError['message'] ?? $response->body(),
+                'more_info' => $twilioError['more_info'] ?? null,
             ]);
 
-            throw new RuntimeException('Failed to send OTP via WhatsApp.');
+            $code = filled($twilioError['code'] ?? null) ? " Twilio error {$twilioError['code']}." : '';
+            $message = filled($twilioError['message'] ?? null) ? ' '.$twilioError['message'] : '';
+
+            throw new RuntimeException("Failed to send OTP via WhatsApp.{$code}{$message}");
         }
 
         return [

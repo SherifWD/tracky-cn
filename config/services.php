@@ -40,6 +40,7 @@ return [
         'messaging_service_sid' => env('TWILIO_MESSAGING_SERVICE_SID'),
         'whatsapp_from' => env('TWILIO_WHATSAPP_FROM', 'whatsapp:+14155238886'),
         'whatsapp_content_sid' => env('TWILIO_WHATSAPP_CONTENT_SID'),
+        'whatsapp_require_template' => env('TWILIO_WHATSAPP_REQUIRE_TEMPLATE', env('APP_ENV', 'production') === 'production'),
         'otp_variable' => env('TWILIO_WHATSAPP_OTP_VARIABLE', '1'),
         'otp_ttl' => env('TWILIO_OTP_TTL', 10),
         'otp_message' => env('TWILIO_OTP_MESSAGE', 'Your OTP code is: :otp'),
