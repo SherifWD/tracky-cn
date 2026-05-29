@@ -6,44 +6,32 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class TwilioWhatsAppOtpService
+class TwilioSmsOtpService
 {
     public function send(string $phone, string $countryCode, string $otp): array
     {
         $accountSid = config('services.twilio.account_sid');
         $authToken = config('services.twilio.auth_token');
         $messagingServiceSid = config('services.twilio.messaging_service_sid');
-        $from = config('services.twilio.whatsapp_from');
+        $from = config('services.twilio.from');
 
         if (blank($accountSid) || blank($authToken)) {
             throw new RuntimeException('Twilio credentials are not configured.');
         }
 
         if (blank($messagingServiceSid) && blank($from)) {
-            throw new RuntimeException('Twilio WhatsApp sender is not configured.');
+            throw new RuntimeException('Twilio SMS sender is not configured.');
         }
 
         $payload = [
-            'To' => $this->formatWhatsAppAddress($this->normalizePhoneNumber($phone, $countryCode)),
+            'To' => $this->normalizePhoneNumber($phone, $countryCode),
+            'Body' => str_replace(':otp', $otp, config('services.twilio.otp_message')),
         ];
 
         if (filled($messagingServiceSid)) {
             $payload['MessagingServiceSid'] = $messagingServiceSid;
         } else {
-            $payload['From'] = $this->formatWhatsAppAddress($from);
-        }
-
-        $contentSid = config('services.twilio.whatsapp_content_sid');
-
-        if (filled($contentSid)) {
-            $payload['ContentSid'] = $contentSid;
-            $payload['ContentVariables'] = json_encode([
-                config('services.twilio.otp_variable', '1') => $otp,
-            ]);
-        } elseif (config('services.twilio.whatsapp_require_template')) {
-            throw new RuntimeException('Twilio WhatsApp Content SID is required for production OTP messages.');
-        } else {
-            $payload['Body'] = str_replace(':otp', $otp, config('services.twilio.otp_message'));
+            $payload['From'] = $this->formatSmsSender($from);
         }
 
         $response = Http::asForm()
@@ -53,7 +41,7 @@ class TwilioWhatsAppOtpService
         if ($response->failed()) {
             $twilioError = $response->json() ?: [];
 
-            Log::error('Twilio WhatsApp OTP failed.', [
+            Log::error('Twilio SMS OTP failed.', [
                 'status' => $response->status(),
                 'code' => $twilioError['code'] ?? null,
                 'message' => $twilioError['message'] ?? $response->body(),
@@ -63,7 +51,7 @@ class TwilioWhatsAppOtpService
             $code = filled($twilioError['code'] ?? null) ? " Twilio error {$twilioError['code']}." : '';
             $message = filled($twilioError['message'] ?? null) ? ' '.$twilioError['message'] : '';
 
-            throw new RuntimeException("Failed to send OTP via WhatsApp.{$code}{$message}");
+            throw new RuntimeException("Failed to send OTP via SMS.{$code}{$message}");
         }
 
         return [
@@ -91,18 +79,16 @@ class TwilioWhatsAppOtpService
         return '+'.$countryDigits.ltrim($phoneDigits, '0');
     }
 
-    private function formatWhatsAppAddress(string $number): string
+    private function formatSmsSender(string $sender): string
     {
-        $number = trim($number);
+        $sender = trim($sender);
 
-        if (str_starts_with($number, 'whatsapp:')) {
-            return $number;
+        if (str_starts_with($sender, '+')) {
+            return '+'.preg_replace('/\D+/', '', $sender);
         }
 
-        if (! str_starts_with($number, '+')) {
-            $number = '+'.preg_replace('/\D+/', '', $number);
-        }
+        $digits = preg_replace('/\D+/', '', $sender);
 
-        return 'whatsapp:'.$number;
+        return $digits === '' ? $sender : '+'.$digits;
     }
 }

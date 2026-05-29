@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Services\TwilioWhatsAppOtpService;
+use App\Services\TwilioSmsOtpService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
@@ -43,7 +43,7 @@ class AuthOtpTest extends TestCase
         });
     }
 
-    public function test_login_sends_whatsapp_otp_and_stores_expiry(): void
+    public function test_login_sends_sms_otp_and_stores_expiry(): void
     {
         $user = User::create([
             'phone' => '01012345678',
@@ -52,7 +52,7 @@ class AuthOtpTest extends TestCase
 
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01012345678', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -83,11 +83,11 @@ class AuthOtpTest extends TestCase
         $this->assertNotNull($user->otp_expires_at);
     }
 
-    public function test_login_sends_whatsapp_otp_for_unknown_phone_without_creating_user(): void
+    public function test_login_sends_sms_otp_for_unknown_phone_without_creating_user(): void
     {
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01099999999', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -127,7 +127,7 @@ class AuthOtpTest extends TestCase
 
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01006138028', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -159,7 +159,7 @@ class AuthOtpTest extends TestCase
             'country_code' => '+218',
         ]);
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01006138028', '+20', Mockery::type('string'))
@@ -249,7 +249,7 @@ class AuthOtpTest extends TestCase
     {
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01099999999', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -320,7 +320,7 @@ class AuthOtpTest extends TestCase
 
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01006138028', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -364,7 +364,7 @@ class AuthOtpTest extends TestCase
     {
         $sentOtp = null;
 
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) use (&$sentOtp) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) use (&$sentOtp) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01099999999', '+20', Mockery::on(function ($otp) use (&$sentOtp) {
@@ -410,7 +410,7 @@ class AuthOtpTest extends TestCase
 
     public function test_validate_otp_does_not_register_unknown_phone_when_pending_otp_is_wrong(): void
     {
-        $this->mock(TwilioWhatsAppOtpService::class, function ($mock) {
+        $this->mock(TwilioSmsOtpService::class, function ($mock) {
             $mock->shouldReceive('send')
                 ->once()
                 ->with('01099999999', '+20', Mockery::type('string'))

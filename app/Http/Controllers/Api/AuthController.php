@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\TwilioWhatsAppOtpService;
+use App\Services\TwilioSmsOtpService;
 use App\Traits\backendTraits;
 use App\Traits\HelpersTrait;
 use Illuminate\Http\Request;
@@ -20,7 +20,7 @@ class AuthController extends Controller
     use backendTraits;
     use HelpersTrait;
 
-    public function __construct(private TwilioWhatsAppOtpService $otpSender) {}
+    public function __construct(private TwilioSmsOtpService $otpSender) {}
 
     public function login(Request $request)
     {
