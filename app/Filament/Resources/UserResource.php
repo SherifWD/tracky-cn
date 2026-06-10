@@ -3,15 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UserResource extends Resource
 {
@@ -74,6 +72,11 @@ class UserResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('tmp_otp')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('temp_password_expires_at')
+                    ->label('Temp password expires')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -90,6 +93,24 @@ class UserResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\Action::make('generateTempPassword')
+                    ->label('Generate temp password')
+                    ->icon('heroicon-o-key')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Generate temporary password')
+                    ->modalDescription('This replaces any existing temporary password. The new password is valid for 1 hour.')
+                    ->action(function (User $record): void {
+                        $password = $record->generateTempPassword();
+                        $expiresAt = $record->temp_password_expires_at?->toDateTimeString();
+
+                        Notification::make()
+                            ->title('Temporary password generated')
+                            ->body("Password: {$password}\nExpires: {$expiresAt}")
+                            ->success()
+                            ->persistent()
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

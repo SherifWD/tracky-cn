@@ -20,7 +20,7 @@ class TwilioSmsOtpService
         }
 
         if (blank($messagingServiceSid) && blank($from)) {
-            throw new RuntimeException('Twilio SMS sender is not configured.');
+            throw new RuntimeException('Twilio SMS sender is not configured. Set TWILIO_SMS_FROM or TWILIO_MESSAGING_SERVICE_SID.');
         }
 
         $payload = [

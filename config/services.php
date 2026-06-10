@@ -38,7 +38,7 @@ return [
         'account_sid' => env('TWILIO_ACCOUNT_SID'),
         'auth_token' => env('TWILIO_AUTH_TOKEN'),
         'messaging_service_sid' => env('TWILIO_MESSAGING_SERVICE_SID'),
-        'from' => env('TWILIO_SMS_FROM', env('TWILIO_FROM', env('TWILIO_PHONE_NUMBER'))),
+        'from' => env('TWILIO_SMS_FROM', env('TWILIO_FROM', env('TWILIO_PHONE_NUMBER', env('TWILIO_WHATSAPP_FROM')))),
         'otp_ttl' => env('TWILIO_OTP_TTL', 10),
         'otp_message' => env('TWILIO_OTP_MESSAGE', 'Your OTP code is: :otp'),
     ],

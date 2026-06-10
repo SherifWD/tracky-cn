@@ -8,6 +8,8 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
@@ -30,6 +32,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
 
     protected $hidden = [
         'password',
+        'temp_password',
         'remember_token',
         'otp',
         'tmp_otp',
@@ -38,7 +41,28 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     protected $casts = [
         'email_verified_at' => 'datetime',
         'otp_expires_at' => 'datetime',
+        'temp_password_expires_at' => 'datetime',
     ];
+
+    public function generateTempPassword(int $ttlMinutes = 60): string
+    {
+        $password = Str::password(10, letters: true, numbers: true, symbols: false, spaces: false);
+
+        $this->forceFill([
+            'temp_password' => Hash::make($password),
+            'temp_password_expires_at' => now()->addMinutes($ttlMinutes),
+        ])->save();
+
+        return $password;
+    }
+
+    public function isTempPasswordValid(string $password): bool
+    {
+        return filled($this->temp_password)
+            && filled($this->temp_password_expires_at)
+            && now()->lessThanOrEqualTo($this->temp_password_expires_at)
+            && Hash::check($password, $this->temp_password);
+    }
 
     public function canAccessPanel(Panel $panel): bool
     {

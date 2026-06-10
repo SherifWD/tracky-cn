@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MetaController;
+use App\Http\Controllers\Api\ProjectSettingController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserFlowController;
 use App\Http\Middleware\JwtMiddleware;
@@ -14,6 +15,8 @@ Route::prefix('auth')->group(function () {
     Route::post('validate-otp', [AuthController::class, 'validateOtp']);
     Route::post('login/validate-otp', [AuthController::class, 'loginValidateOtp']);
 });
+
+Route::get('settings/whatsapp-number', [ProjectSettingController::class, 'whatsappNumber']);
 
 Route::prefix('auth')->middleware([JwtMiddleware::class])->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);

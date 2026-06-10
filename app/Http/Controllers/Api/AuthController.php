@@ -24,9 +24,13 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $tempPassword = $this->tempPasswordFromRequest($request);
+
         $validator = Validator::make($request->all(), [
             'phone' => 'required|string',
-            'country_code' => 'required|string',
+            'country_code' => [$tempPassword === null ? 'required' : 'nullable', 'string'],
+            'password' => 'nullable|string',
+            'temp_password' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -35,6 +39,11 @@ class AuthController extends Controller
 
         $phone = (string) $request->phone;
         $countryCode = (string) $request->country_code;
+
+        if ($tempPassword !== null) {
+            return $this->tempPasswordLoginResponse($phone, $countryCode, $tempPassword);
+        }
+
         $user = $this->findUserByPhone($phone, $countryCode);
 
         if ($user) {
@@ -55,10 +64,15 @@ class AuthController extends Controller
 
     public function validateOtp(Request $request)
     {
+        $tempPassword = $this->tempPasswordFromRequest($request);
+        $hasOtp = filled($request->input('otp'));
+
         $validator = Validator::make($request->all(), [
             'phone' => 'required|string',
-            'country_code' => 'required|string',
-            'otp' => 'required|string',
+            'country_code' => [$tempPassword !== null && ! $hasOtp ? 'nullable' : 'required', 'string'],
+            'otp' => 'required_without_all:password,temp_password|nullable|string',
+            'password' => 'required_without_all:otp,temp_password|nullable|string',
+            'temp_password' => 'required_without_all:otp,password|nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -68,6 +82,11 @@ class AuthController extends Controller
         try {
             $phone = (string) $request->phone;
             $countryCode = (string) $request->country_code;
+
+            if (! $hasOtp && $tempPassword !== null) {
+                return $this->tempPasswordLoginResponse($phone, $countryCode, $tempPassword);
+            }
+
             $otp = $this->normalizeOtp((string) $request->otp);
             $user = $this->findUserByPhone($phone, $countryCode);
 
@@ -288,6 +307,68 @@ class AuthController extends Controller
         return $this->returnData('token', compact('token', 'user'), $message);
     }
 
+    private function tempPasswordLoginResponse(string $phone, ?string $countryCode, string $password)
+    {
+        try {
+            $user = $this->findUserByTempPasswordCredentials($phone, $countryCode, $password);
+
+            if (! $user) {
+                return $this->returnError('E002', 'Invalid or expired temporary password');
+            }
+
+            $token = JWTAuth::fromUser($user);
+
+            return $this->tokenResponse($user, $token, 'Temporary password validated successfully');
+        } catch (Throwable $e) {
+            Log::error('Error in tempPasswordLoginResponse: '.$e->getMessage());
+
+            return $this->returnError('E500', 'Failed to validate temporary password. Please try again.');
+        }
+    }
+
+    private function findUserByTempPasswordCredentials(string $phone, ?string $countryCode, string $password): ?User
+    {
+        return $this->tempPasswordCandidates($phone, $countryCode)
+            ->first(fn (User $user): bool => $user->isTempPasswordValid($password));
+    }
+
+    private function tempPasswordCandidates(string $phone, ?string $countryCode)
+    {
+        if (filled($countryCode)) {
+            $user = $this->findUserByPhone($phone, $countryCode);
+
+            return collect($user ? [$user] : []);
+        }
+
+        return User::whereNotNull('temp_password')
+            ->get()
+            ->filter(fn (User $user): bool => $this->phoneMatchesForTempPassword($user, $phone))
+            ->values();
+    }
+
+    private function phoneMatchesForTempPassword(User $user, string $phone): bool
+    {
+        $phone = trim($phone);
+        $phoneDigits = preg_replace('/\D+/', '', $phone);
+        $phoneVariants = $this->phoneVariants((string) $user->phone, (string) $user->country_code);
+
+        if (in_array($phone, $phoneVariants, true) || in_array($phoneDigits, $phoneVariants, true)) {
+            return true;
+        }
+
+        if ($phoneDigits === '') {
+            return false;
+        }
+
+        $userFullDigits = preg_replace(
+            '/\D+/',
+            '',
+            $this->normalizeFullPhoneNumber((string) $user->phone, (string) $user->country_code)
+        );
+
+        return $userFullDigits === $phoneDigits;
+    }
+
     private function findUserByPhone(string $phone, string $countryCode): ?User
     {
         $phone = trim($phone);
@@ -376,5 +457,16 @@ class AuthController extends Controller
     private function normalizeOtp(string $otp): string
     {
         return preg_replace('/\D+/', '', trim($otp));
+    }
+
+    private function tempPasswordFromRequest(Request $request): ?string
+    {
+        foreach (['password', 'temp_password'] as $field) {
+            if ($request->filled($field)) {
+                return trim((string) $request->input($field));
+            }
+        }
+
+        return null;
     }
 }

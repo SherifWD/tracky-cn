@@ -33,6 +33,8 @@ class AuthOtpTest extends TestCase
             $table->string('email')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
+            $table->string('temp_password')->nullable();
+            $table->timestamp('temp_password_expires_at')->nullable();
             $table->boolean('is_active')->default(0);
             $table->string('otp')->nullable();
             $table->string('tmp_otp')->nullable();
@@ -437,6 +439,92 @@ class AuthOtpTest extends TestCase
             'phone' => '01099999999',
             'country_code' => '+20',
         ]);
+    }
+
+    public function test_login_accepts_valid_temp_password_without_country_code(): void
+    {
+        $user = User::create([
+            'phone' => '01012345678',
+            'country_code' => '+20',
+        ]);
+
+        $password = $user->generateTempPassword();
+
+        $response = $this->postJson('/api/auth/login', [
+            'phone' => '01012345678',
+            'password' => $password,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'Temporary password validated successfully')
+            ->assertJsonPath('data.user.id', $user->id)
+            ->assertJsonStructure([
+                'data' => [
+                    'token',
+                    'user',
+                ],
+            ]);
+
+        $this->assertArrayNotHasKey('temp_password', $response->json('data.user'));
+    }
+
+    public function test_validate_otp_accepts_temp_password_alias_with_full_phone_number(): void
+    {
+        $user = User::create([
+            'phone' => '01012345678',
+            'country_code' => '+20',
+        ]);
+
+        $password = $user->generateTempPassword();
+
+        $response = $this->postJson('/api/auth/login/validate-otp', [
+            'phone' => '+201012345678',
+            'temp_password' => $password,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('msg', 'Temporary password validated successfully')
+            ->assertJsonPath('data.user.id', $user->id);
+    }
+
+    public function test_temp_password_expires_and_generation_overwrites_previous_password(): void
+    {
+        $user = User::create([
+            'phone' => '01012345678',
+            'country_code' => '+20',
+        ]);
+
+        $oldPassword = $user->generateTempPassword();
+        $newPassword = $user->generateTempPassword();
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01012345678',
+            'password' => $oldPassword,
+        ])
+            ->assertOk()
+            ->assertJsonPath('result', false)
+            ->assertJsonPath('msg', 'Invalid or expired temporary password');
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01012345678',
+            'password' => $newPassword,
+        ])
+            ->assertOk()
+            ->assertJsonPath('result', true);
+
+        $expiredPassword = $user->generateTempPassword(-1);
+
+        $this->postJson('/api/auth/login', [
+            'phone' => '01012345678',
+            'password' => $expiredPassword,
+        ])
+            ->assertOk()
+            ->assertJsonPath('result', false)
+            ->assertJsonPath('msg', 'Invalid or expired temporary password');
     }
 
     public function test_auto_login_returns_same_token_and_user_shape_as_otp_validation(): void
