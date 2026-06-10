@@ -33,6 +33,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     protected $hidden = [
         'password',
         'temp_password',
+        'temp_password_value',
         'remember_token',
         'otp',
         'tmp_otp',
@@ -41,6 +42,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
     protected $casts = [
         'email_verified_at' => 'datetime',
         'otp_expires_at' => 'datetime',
+        'temp_password_value' => 'encrypted',
         'temp_password_expires_at' => 'datetime',
     ];
 
@@ -50,6 +52,7 @@ class User extends Authenticatable implements FilamentUser, JWTSubject
 
         $this->forceFill([
             'temp_password' => Hash::make($password),
+            'temp_password_value' => $password,
             'temp_password_expires_at' => now()->addMinutes($ttlMinutes),
         ])->save();
 

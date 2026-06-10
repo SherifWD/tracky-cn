@@ -34,6 +34,7 @@ class AuthOtpTest extends TestCase
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
             $table->string('temp_password')->nullable();
+            $table->text('temp_password_value')->nullable();
             $table->timestamp('temp_password_expires_at')->nullable();
             $table->boolean('is_active')->default(0);
             $table->string('otp')->nullable();
@@ -468,6 +469,8 @@ class AuthOtpTest extends TestCase
             ]);
 
         $this->assertArrayNotHasKey('temp_password', $response->json('data.user'));
+        $this->assertArrayNotHasKey('temp_password_value', $response->json('data.user'));
+        $this->assertSame($password, $user->refresh()->temp_password_value);
     }
 
     public function test_validate_otp_accepts_temp_password_alias_with_full_phone_number(): void

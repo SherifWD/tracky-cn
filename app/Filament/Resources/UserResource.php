@@ -72,6 +72,12 @@ class UserResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('tmp_otp')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('temp_password_value')
+                    ->label('Temp password')
+                    ->copyable(fn (?string $state): bool => filled($state))
+                    ->copyMessage('Temp password copied')
+                    ->placeholder('-')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('temp_password_expires_at')
                     ->label('Temp password expires')
                     ->dateTime()
